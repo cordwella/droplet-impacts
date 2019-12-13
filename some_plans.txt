@@ -1,0 +1,35 @@
+Software plans
+--------------------------------
+
+This is for the phase plot
+
+- get a list of all of the videos to be included in the phase plot
+- from their naming etc identify which settings for processing to use (contrast, top height, impact line, how to identify start and stop)
+
+Processing the video (top down):
+- Find frame of full entry into the video
+- Find frame of initial impact 
+- Calculate Weber Numbers volumes etcg
+- full graph can be reported, but actually only record a summary
+MVP: Ask the user to identify it as crown, splash, or spread at maximum spread (speed modification on thing? What already exists for this?)
+Later on, attempt to do some more qualitative calculations of this (including max height, time to maxium height, maxium spread (diameter)) Take a guess at this point, but still allow for human intervention, max height is the max height of the rosensweig instability
+
+
+full graphs should be generatable (for checking etc) but not saved directly
+
+
+Save this data to a file (csv/database etc) with columns
+file id, filename, (date, who took the data, when processed etc), final weber number, initial final and average volume, maximum spread, max height, time to max height
+
+
+Allow for some overwriting/updating in the database? sqlite would make this really easy to do ... 
+However I think the initial priority is not that? I'm unsure what my priority should be in terms of developing this, i do love sqlite tho ...
+
+
+-> if I was doing this in matlab or plain text it wouldn't be too hard to go from the ids, and delete all but the most recent one with that ID -> hash tables are nice
+
+
+
+I think the initial priority is to look at the existing code, see what I can steal and how much better matlab could be -> what would I gain from it when I lose all of my familiarty and speed when it comes to python, and also note that I would most likely have to work on windows for either, which makes my linux skills moot
+
+this then brings me onto enviroment and interaction questions which blah
