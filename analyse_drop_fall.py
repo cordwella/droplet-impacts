@@ -1,6 +1,7 @@
 """
-A modified version of Stephen Chung's code for extracting
-the velocities and Weber number of a ferrofluid droplet
+Author: Amelia Cordwell
+Description: Analysis and graphing code for the side view of a falling
+ferrofluid droplet.
 """
 
 import matplotlib.pyplot as plt
@@ -8,25 +9,26 @@ import matplotlib.animation as animation
 import numpy as np
 import cv2
 
-# Configurable constants
-THRESHOLD_LEVEL = 50  # thresholding the image to pick up the drop
-CROP_DIMENSIONS = (0, 0, 665, 300)  # crop the image to these dimensions
-                        # (ystart, xstart, yend, xend)
-                        # standard numpy array rules
-DENSITY = 1210       # The density of the ferrofluid (kg/m^3)
-SURFACE_TENSION = 0.026  # The surface tension of the ferrofluid
-                        # I cant remember the units
-PIXELS_TO_MM = 0.028563817267384453
-PIXELS_TO_METERS = PIXELS_TO_MM * 10**(-3)
-                        # Conversion from pixels to meters
-                        # based on the slide in use
-                        # might be automated later
-FRAMES_PER_SECOND = 2000
 
-SUBTRACT_BACKGROUND = False
+class ConfigurationStephen:
+    # Configurable constants
+    THRESHOLD_LEVEL = 50  # thresholding the image to pick up the drop
+    CROP_DIMENSIONS = (0, 0, 665, 300)
+    # crop the image to these dimensions
+    # (ystart, xstart, yend, xend)
+    DENSITY = 1210       # The density of the ferrofluid (kg/m^3)
+    SURFACE_TENSION = 0.026  # The surface tension of the ferrofluid
+    PIXELS_TO_MM = 0.028563817267384453
+    PIXELS_TO_METERS = PIXELS_TO_MM * 10**(-3)
+    # Conversion from pixels to meters
+    # based on the slide in use
+    FRAMES_PER_SECOND = 2000
 
-# possibly best to take this from the configuration
-# files from PFV
+    SUBTRACT_BACKGROUND = False
+
+    # maxiumum number of frames to consider
+    MAXIMUM_FRAME_NO = 500
+
 
 # Later on this should be stdin, or called from an actual function#
 # videodirectory = input("Enter video directory" )
@@ -42,20 +44,10 @@ SUBTRACT_BACKGROUND = False
 # filename = "/home/amelia/Documents/ferrofluids/p01c2_C2.avi"
 filename = "/home/amelia/Documents/ferrofluids/from server/Magnet/Sm_23mm/11018_C2/11018_C2.avi"
 
-# filename = videodirectory + "/" + videodirectory.split("/")[1] + '/avi'
-# startingframe = int(input("Enter the first frame with the entire drop: "))
-# endingframe = int(input("Enter the last frame before impact:"))
-
-# startingframe = 11
-endingframe = 300
-
-calculated_starting_frame = None
-
-
 plt.style.use('ggplot')
 
 
-def open_video(filename, endingframe):
+def open_video(filename, config):
     frame_array = []
     threshold_frame_array = []
 
@@ -66,7 +58,7 @@ def open_video(filename, endingframe):
     calculated_starting_frame = False
     background_image = None
 
-    while success and count <= endingframe:
+    while success and len(frame_array) <= config.MAXIMUM_FRAME_NO:
         # write files to frames
         success, image = vidcap.read()
         if not success:
@@ -79,10 +71,11 @@ def open_video(filename, endingframe):
         # be nessecary
 
         # perform image testing
-        if CROP_DIMENSIONS:
+        if config.CROP_DIMENSIONS:
+            CROP_DIMENSIONS = config.CROP_DIMENSIONS
             image = image[CROP_DIMENSIONS[0]:CROP_DIMENSIONS[2],
                           CROP_DIMENSIONS[1]:CROP_DIMENSIONS[3]]
-        if SUBTRACT_BACKGROUND:
+        if config.SUBTRACT_BACKGROUND:
             if background_image is None:
                 # first frame is the background image
                 background_image = image
@@ -91,7 +84,7 @@ def open_video(filename, endingframe):
             # todo -> check that this doesn't go negative or do
             # weird things
 
-        threshold_image = (image < THRESHOLD_LEVEL).astype(int)
+        threshold_image = (image < config.THRESHOLD_LEVEL).astype(int)
 
         if calculated_starting_frame:
             frame_array.append(image)
@@ -105,11 +98,10 @@ def open_video(filename, endingframe):
 
         count += 1
 
-
     # check on this video to make sure it looks right
     # maybe by saving this?
     # return calculated calculated_starting_frame
-    return frame_array, threshold_frame_array
+    return frame_array, threshold_frame_array, calculated_starting_frame
 
 
 def get_droplet_positions(threshold_frame):
@@ -139,7 +131,7 @@ def get_droplet_positions(threshold_frame):
     return minx, miny, maxx, maxy
 
 
-def compute_droplet_values_single_frame(threshold_frame):
+def compute_droplet_values_single_frame(threshold_frame, config):
     # part of the reason that that could be an issue is the double
     # droplets in images, leading to two objects on the binary
     # stephens method won't work for this
@@ -243,19 +235,19 @@ def compute_droplet_values_single_frame(threshold_frame):
 
     # convert to meters
 
-    vertical_com = vertical_com * PIXELS_TO_METERS
-    horizontal_com = horizontal_com * PIXELS_TO_METERS
-    top_y_coordinate = starting_position[0] * PIXELS_TO_METERS
-    bottom_y_coord = y_coord * PIXELS_TO_METERS
-    max_width = max_width * PIXELS_TO_METERS
-    length = length * PIXELS_TO_METERS
+    vertical_com = vertical_com * config.PIXELS_TO_METERS
+    horizontal_com = horizontal_com * config.PIXELS_TO_METERS
+    top_y_coordinate = starting_position[0] * config.PIXELS_TO_METERS
+    bottom_y_coord = y_coord * config.PIXELS_TO_METERS
+    max_width = max_width * config.PIXELS_TO_METERS
+    length = length * config.PIXELS_TO_METERS
 
-    volume = volume * PIXELS_TO_METERS**3  # cylindrical volume approximation
-    volume_ellipse = volume_ellipse * PIXELS_TO_METERS**3
+    volume = volume * config.PIXELS_TO_METERS**3  # cylindrical volume approximation
+    volume_ellipse = volume_ellipse * config.PIXELS_TO_METERS**3
     surface_area_ellipse = surface_area_ellipse
 
-    volume_cone = volume_cone * PIXELS_TO_METERS**3
-    surface_area_cone = surface_area_cone * PIXELS_TO_METERS**2
+    volume_cone = volume_cone * config.PIXELS_TO_METERS**3
+    surface_area_cone = surface_area_cone * config.PIXELS_TO_METERS**2
 
     return (vertical_com, horizontal_com, top_y_coordinate, bottom_y_coord,
             max_width, length,
@@ -263,19 +255,19 @@ def compute_droplet_values_single_frame(threshold_frame):
             volume_cone, surface_area_cone)
 
 
-def compute_velocity(positions):
+def compute_velocity(positions, config):
     positions = np.array(positions)
     # compute velocities attached to the current frame and the frame
     # before, this will mean that there is a velocity associated with
     # all frames except the first one
 
     dy = (positions[1:] - positions[:-1])
-    velocity = dy * FRAMES_PER_SECOND
+    velocity = dy * config.FRAMES_PER_SECOND
 
     return velocity
 
 
-def display_video_with_com(frames, threshold_frames, frame_data):
+def display_video_with_com(frames, threshold_frames, frame_data, config):
 
     fig, ax = plt.subplots(1, 2, sharey='all', sharex='all')
 
@@ -289,15 +281,15 @@ def display_video_with_com(frames, threshold_frames, frame_data):
         # comx and comy are in meters, however to
         # display on the video that has to be converted
         # back into pixels
-        comx = frame_data[i, 1]/PIXELS_TO_METERS
-        comy = frame_data[i, 0]/PIXELS_TO_METERS
+        comx = frame_data[i, 1]/config.PIXELS_TO_METERS
+        comy = frame_data[i, 0]/config.PIXELS_TO_METERS
 
         ax[0].scatter(comx, comy, marker='x', label="CoM")
         ax[1].scatter(comx, comy, marker='x', label="CoM")
 
         ax[0].legend()
         ax[1].legend()
-        plt.title(i)
+        ax[0].set_title(i)
 
     ani = animation.FuncAnimation(fig, loop_frame, frames=len(frame_data),  # noqa
                                   interval=50)
@@ -305,11 +297,11 @@ def display_video_with_com(frames, threshold_frames, frame_data):
     return ani
 
 
-def graph_velocities_and_length(full_frame_data):
+def graph_velocities_and_length(full_frame_data, config):
     fig, ax = plt.subplots(1, 4, sharex='all')
 
     # plot velocites as a function of time
-    times = np.arange(len(full_frame_data))/FRAMES_PER_SECOND
+    times = np.arange(len(full_frame_data))/config.FRAMES_PER_SECOND
     # velocity_times = times + .5/FRAMES_PER_SECOND
     ax[0].plot(times, full_frame_data[:, 11], label="CoM Velocity")
     ax[0].plot(times, full_frame_data[:, 12], label="CoM x Velocity")
@@ -351,34 +343,64 @@ def graph_velocities_and_length(full_frame_data):
 
 
 def display_frame_and_surrounding(frames, frame_number, title=None):
-    fig, ax = plt.subplots(1, 3, sharey='all', sharex='all')
+    fig, ax = plt.subplots(1, 5, sharey='all', sharex='all')
 
-    ax[0].imshow(frames[frame_number - 1], cmap='gray')
+    ax[0].imshow(frames[frame_number - 3], cmap='gray')
+    ax[0].set_title("3 behind")
+
     ax[1].imshow(frames[frame_number], cmap='gray')
     if title is not None:
-        plt.title(title)
+        ax[1].set_title(title)
 
-    ax[2].imshow(frames[frame_number + 1], cmap='gray')
+    ax[2].imshow(frames[frame_number + 3], cmap='gray')
+    ax[2].set_title("3 ahead")
+
+    ax[3].imshow(frames[frame_number + 3], cmap='gray')
+    ax[3].set_title("5 ahead")
+
+    ax[4].imshow(frames[frame_number + 9], cmap='gray')
+    ax[4].set_title("9 ahead")
 
 
-def process_side_video(filename, configuration, graphs=True):
+def find_dynamic_max_spread(full_frames_data, pre_impact_frame):
+    """
+    During relaxation into Rosensweig instabilities the diameter
+    may grow beyond the maximum spread due to impact phenomena, as
+    such the dynamic max spread is not simply found by an arg
+    max on the array.
 
-    # frame offset = ??????
-    frame_offset = 0
-    frames, threshold_frames = open_video(filename, endingframe)
+    There are a number of ways of dealing with this, today however
+    I will be taking the lazy way out and assuming that max spread
+    happens within 40 frames of impact (maybe this should be a
+    configurable data point for later on, ugh that's not setup
+    yet)
+
+    Later this could be done better, possibly by numerical
+    differentiation
+
+    returns: the frame that contains the maximum spread of
+    the droplet
+    """
+    return np.argmax(full_frames_data[
+            pre_impact_frame:pre_impact_frame+40, 4]) + pre_impact_frame
+
+
+def process_side_video(filename, config, graphs=True):
+    frames, threshold_frames, frame_offset = open_video(filename, config)
 
     frame_data = []
 
     for frame in threshold_frames:
-        frame_data.append(compute_droplet_values_single_frame(frame))
+        frame_data.append(compute_droplet_values_single_frame(
+            frame, config))
 
     frame_data = np.array(frame_data)
 
     # compute velocites
-    com_velocity = compute_velocity(frame_data[:, 0])
-    com_x_velocity = compute_velocity(frame_data[:, 1])
-    tip_velocity = compute_velocity(frame_data[:, 2])
-    top_velocity = compute_velocity(frame_data[:, 3])
+    com_velocity = compute_velocity(frame_data[:, 0], config)
+    com_x_velocity = compute_velocity(frame_data[:, 1], config)
+    tip_velocity = compute_velocity(frame_data[:, 2], config)
+    top_velocity = compute_velocity(frame_data[:, 3], config)
 
     # remove first frame
     # compute various weber numbers
@@ -393,17 +415,17 @@ def process_side_video(filename, configuration, graphs=True):
                    (np.sqrt(1 - diameters**2/lengths)))
         + diameters)
 
-    weber_number_report = (np.pi * DENSITY * lengths * diameters**2 *
+    weber_number_report = (np.pi * config.DENSITY * lengths * diameters**2 *
                            com_velocity**2 /
-                           (surface_area * SURFACE_TENSION))
+                           (surface_area * config.SURFACE_TENSION))
 
     weber_number_first_princ = 12 * (
-        DENSITY * frame_data[1:, 6] * 0.5 *
-        com_velocity**2/(surface_area * SURFACE_TENSION))
+        config.DENSITY * frame_data[1:, 6] * 0.5 *
+        com_velocity**2/(surface_area * config.SURFACE_TENSION))
 
     weber_number_first_princ_surface_area = 12 * (
-        DENSITY * frame_data[1:, 9] * 0.5 *
-        com_velocity**2/(frame_data[1:, 10] * SURFACE_TENSION))
+        config.DENSITY * frame_data[1:, 9] * 0.5 *
+        com_velocity**2/(frame_data[1:, 10] * config.SURFACE_TENSION))
 
     # full frame data contains ...
     # theres a part of me who knows how hacky this looks
@@ -413,7 +435,8 @@ def process_side_video(filename, configuration, graphs=True):
 
     full_frames_data = np.concatenate(
         (*a,
-         com_velocity.reshape(shape), com_x_velocity.reshape(shape), tip_velocity.reshape(shape), top_velocity.reshape(shape),
+         com_velocity.reshape(shape), com_x_velocity.reshape(shape),
+         tip_velocity.reshape(shape), top_velocity.reshape(shape),
          weber_number_report.reshape(shape),
          weber_number_first_princ.reshape(shape),
          weber_number_first_princ_surface_area.reshape(shape)), axis=1)
@@ -427,10 +450,13 @@ def process_side_video(filename, configuration, graphs=True):
     # this also gives the reported weber numbers
 
     # compute max spread frame -> give max spread
-    max_spread_frame = np.argmax(full_frames_data[:, 4])
-
+    max_spread_frame = find_dynamic_max_spread(full_frames_data,
+                                               pre_impact_frame)
     max_spread = full_frames_data[max_spread_frame, 4]
-    time_to_max_spread = None
+
+    # time from last pre impact frame
+    time_to_max_spread = (
+        max_spread_frame - pre_impact_frame)/config.FRAMES_PER_SECOND
 
     # There are two maximums in the height
     # the first will occur before impact due to elongation
@@ -442,18 +468,19 @@ def process_side_video(filename, configuration, graphs=True):
         max_spread_frame)
 
     max_height = full_frames_data[max_height_frame, 5]
-    time_to_max_height = None
+    time_to_max_height = (
+        max_height_frame - pre_impact_frame)/config.FRAMES_PER_SECOND
 
     # pretty print print summary
     # csv summary
 
     if graphs:
         animation = display_video_with_com(frames, threshold_frames,
-                                           full_frames_data)
+                                           full_frames_data, config)
         # draw on max spread and weber number points?
         # so this can be saved?
         # save this in good folders?
-        graph_velocities_and_length(full_frames_data)
+        graph_velocities_and_length(full_frames_data, config)
 
         display_frame_and_surrounding(
             frames, max_spread_frame, title="Max spread frame")
@@ -468,12 +495,19 @@ def process_side_video(filename, configuration, graphs=True):
 
     # add volume calculations to this output
     # first, and last pre impact
+
+    start_volume = full_frames_data[0, 9]  # using conical approximation
+    pre_impact_volume = full_frames_data[pre_impact_frame, 9]
+
     return (pre_impact_frame + frame_offset, *report_weber_numbers,
-            max_spread_frame + frame_offset, max_spread,
-            max_height_frame + frame_offset, max_height)
+            max_spread_frame + frame_offset, time_to_max_spread, max_spread,
+            max_height_frame + frame_offset, time_to_max_height, max_height,
+            start_volume, pre_impact_volume)
     # print weber number
     # based on final values?
     # or as a function of time?
 
-
-print(process_side_video(filename, None))
+print("Pre impact frame, weber number report, weber number first principles, weber number first principles cone approximation, max spread frame, time from pre impact frame to max spread frame, max spread width (m), "
+"max height frame, time to max height, max height, first calculated volume,"
+"volume calculated on the pre impact frame")
+print(process_side_video(filename, ConfigurationStephen))
