@@ -13,7 +13,7 @@ import cv2
 class ConfigurationStephen:
     # Configurable constants
     THRESHOLD_LEVEL = 50  # thresholding the image to pick up the drop
-    CROP_DIMENSIONS = (0, 0, 665, 300)
+    CROP_DIMENSIONS = None # (0, 0, 665, 300)
     # crop the image to these dimensions
     # (ystart, xstart, yend, xend)
     DENSITY = 1210       # The density of the ferrofluid (kg/m^3)
@@ -29,6 +29,9 @@ class ConfigurationStephen:
     # maxiumum number of frames to consider
     MAXIMUM_FRAME_NO = 500
 
+    # in pixels
+    MINIMUM_DROPLET_AREA = 60
+
 
 # Later on this should be stdin, or called from an actual function#
 # videodirectory = input("Enter video directory" )
@@ -41,8 +44,8 @@ class ConfigurationStephen:
 # determine cropping dimensions and bottom dimension for thing done, sort of
 #   this is currently determined by
 # or do I determine this by position when
-# filename = "/home/amelia/Documents/ferrofluids/p01c2_C2.avi"
-filename = "/home/amelia/Documents/ferrofluids/from server/Magnet/Sm_23mm/11018_C2/11018_C2.avi"
+filename = "/home/amelia/Documents/ferrofluids/p01c2_C2.avi"
+#filename = "/home/amelia/Documents/ferrofluids/from server/Magnet/Sm_23mm/11018_C2/11018_C2.avi"
 
 plt.style.use('ggplot')
 
@@ -102,6 +105,56 @@ def open_video(filename, config):
     # maybe by saving this?
     # return calculated calculated_starting_frame
     return frame_array, threshold_frame_array, calculated_starting_frame
+
+
+def clean_frame(threshold_frame, config):
+    """ Clean the frame to have the largest object only using open cv functions
+
+    With thanks to stack overflow:
+    https://stackoverflow.com/questions/9056646/python-opencv-find-black-areas-in-a-binary-image
+    """
+
+    cs, _ = cv2.findContours(threshold_frame.astype('uint8'),
+                             mode=cv2.RETR_LIST,
+                             method=cv2.CHAIN_APPROX_SIMPLE)
+    # set up the 'ConvexImage' bit of regionprops.
+    filled_frame = np.zeros(threshold_frame.shape[0:2]).astype('uint8')
+    convex_frame = np.zeros(threshold_frame.shape[0:2]).astype('uint8')
+
+    # for each contour c in cs:
+    # will demonstrate with cs[0] but you could use a loop.
+    object_sizes = np.array([cv2.moments(c)['m00'] for c in cs])
+
+    if not object_sizes.any():
+        return [], []
+    i = np.argmax(object_sizes)
+    c = cs[i]
+    # calculate some things useful later:
+    m = cv2.moments(c)
+
+    # ** regionprops **
+    area = m['m00']
+    # print("region area", area)
+
+    cv2.drawContours(filled_frame, cs, i, color=1, thickness=-1)
+
+    # this should only come up when the droplet is falling
+    # not when it's on the ground at which point it shouldn't be
+    # convex
+    # CONVEX HULL stuff
+    # convex hull vertices
+    convex_hull = cv2.convexHull(c)
+    convex_area = cv2.contourArea(convex_hull)
+    # Solidity := Area/ConvexArea
+    solidity = area/convex_area
+    # print("region solidity", solidity)
+    # convexImage -- draw on convexI
+    cv2.drawContours(convex_frame, [convex_hull], -1,
+                     color=1, thickness=-1)
+    # this is the most useful as it can be passed back to what I actually
+    # calculate in my code
+
+    return filled_frame, convex_frame
 
 
 def get_droplet_positions(threshold_frame):
@@ -267,31 +320,35 @@ def compute_velocity(positions, config):
     return velocity
 
 
-def display_video_with_com(frames, threshold_frames, frame_data, config):
+def display_video_with_com(frames, threshold_frames, convex_thresh_frames,
+                           frame_data, config):
 
-    fig, ax = plt.subplots(1, 2, sharey='all', sharex='all')
+    fig, ax = plt.subplots(1, 3, sharey='all', sharex='all')
 
     def loop_frame(i):
         ax[0].clear()
         ax[1].clear()
+        ax[2].clear()
 
-        ax[0].imshow(frames[i + 1], cmap='gray')
-        ax[1].imshow(threshold_frames[i + 1] * 255, cmap='gray')
+        ax[0].imshow(frames[i], cmap='gray')
+        ax[1].imshow(threshold_frames[i] * 255, cmap='gray')
+        ax[2].imshow(convex_thresh_frames[i] * 255, cmap='gray')
 
         # comx and comy are in meters, however to
         # display on the video that has to be converted
         # back into pixels
-        comx = frame_data[i, 1]/config.PIXELS_TO_METERS
-        comy = frame_data[i, 0]/config.PIXELS_TO_METERS
+        comx = frame_data['convex_data'][i, 1]/config.PIXELS_TO_METERS
+        comy = frame_data['convex_data'][i, 0]/config.PIXELS_TO_METERS
 
         ax[0].scatter(comx, comy, marker='x', label="CoM")
         ax[1].scatter(comx, comy, marker='x', label="CoM")
+        ax[2].scatter(comx, comy, marker='x', label="CoM")
 
         ax[0].legend()
         ax[1].legend()
-        ax[0].set_title(i)
+        ax[1].set_title(i)
 
-    ani = animation.FuncAnimation(fig, loop_frame, frames=len(frame_data),  # noqa
+    ani = animation.FuncAnimation(fig, loop_frame, frames=len(frames) - 1,  # noqa
                                   interval=50)
     # plt.show()
     return ani
@@ -300,13 +357,19 @@ def display_video_with_com(frames, threshold_frames, frame_data, config):
 def graph_velocities_and_length(full_frame_data, config):
     fig, ax = plt.subplots(1, 4, sharex='all')
 
-    # plot velocites as a function of time
-    times = np.arange(len(full_frame_data))/config.FRAMES_PER_SECOND
+    # plot velocities as a function of time
+    times = np.arange(
+        len(full_frame_data['frame_data']))/config.FRAMES_PER_SECOND
     # velocity_times = times + .5/FRAMES_PER_SECOND
-    ax[0].plot(times, full_frame_data[:, 11], label="CoM Velocity")
-    ax[0].plot(times, full_frame_data[:, 12], label="CoM x Velocity")
-    ax[0].plot(times, full_frame_data[:, 13], label="Tip Velocity")
-    ax[0].plot(times, full_frame_data[:, 14], label="Top Velocity")
+    velocity_times = times[1:]
+    ax[0].plot(velocity_times, full_frame_data['velocities']['com'],
+               label="CoM Velocity")
+    ax[0].plot(velocity_times, full_frame_data['velocities']['comx'],
+               label="CoM x Velocity")
+    ax[0].plot(velocity_times, full_frame_data['velocities']['tip'],
+               label="Tip Velocity")
+    ax[0].plot(velocity_times, full_frame_data['velocities']['top'],
+               label="Top Velocity")
     ax[0].set_xlabel("Time (seconds)")
     ax[0].set_ylabel("Velocity (meters/second)")
 
@@ -314,26 +377,30 @@ def graph_velocities_and_length(full_frame_data, config):
     ax[0].set_title("Droplet velocity (m/s)")
     ax[0].legend()
 
-    ax[1].plot(times, full_frame_data[:, 4], label="Droplet Diameter")
-    ax[1].plot(times, full_frame_data[:, 5], label="Droplet Length")
+    ax[1].plot(times, full_frame_data['frame_data'][:, 4],
+               label="Droplet Diameter")
+    ax[1].plot(times, full_frame_data['frame_data'][:, 5],
+               label="Droplet Length")
     ax[1].set_title("Droplet size (m)")
     plt.axis([None, None, 0, 2e-8])
     ax[1].legend()
 
-    ax[2].plot(times, full_frame_data[:, 15],
+    ax[2].plot(velocity_times, full_frame_data['weber_numbers']['report'],
                label="Weber number (report)")
-    ax[2].plot(times, full_frame_data[:, 16],
+    ax[2].plot(velocity_times, full_frame_data['weber_numbers']['first_princ'],
                label="Weber number (first principles)")
-    ax[2].plot(times, full_frame_data[:, 17],
+    ax[2].plot(velocity_times, full_frame_data['weber_numbers']['first_princ_conical'],
                label="Weber number (first principles + conical area)")
 
     ax[2].set_title("Weber Number")
     ax[2].set_xlabel("Time (seconds)")
     ax[2].legend()
 
-    ax[3].plot(times, full_frame_data[:, 6], label="Volume")
-    ax[3].plot(times, full_frame_data[:, 7], label="Volume (Ellipsoid)")
-    ax[3].plot(times, full_frame_data[:, 9], label="Volume (Conical sections)")
+    ax[3].plot(times, full_frame_data['convex_data'][:, 6], label="Volume")
+    ax[3].plot(times, full_frame_data['convex_data'][:, 7],
+               label="Volume (Ellipsoid)")
+    ax[3].plot(times, full_frame_data['convex_data'][:, 9],
+               label="Volume (Conical sections)")
     ax[1].set_xlabel("Time (seconds)")
     ax[3].legend()
 
@@ -389,14 +456,35 @@ def process_side_video(filename, config, graphs=True):
     frames, threshold_frames, frame_offset = open_video(filename, config)
 
     frame_data = []
+    convex_frame_data = []
 
+    convex_thresh_frames = []
+    clean_thresh_frames = []
+    print(len(threshold_frames))
     for frame in threshold_frames:
+        # get largest object
+
+        # frame has only the largest object on it
+        # convex frame has only the convex version of the
+        # largest object on it
+
+        # convex frame is important before impact, but the nonconvex
+        # frame is important afterwards for shape modelling
+
+        frame, convex_frame = clean_frame(frame, config)
+
+        convex_frame_data.append(compute_droplet_values_single_frame(
+            convex_frame, config))
         frame_data.append(compute_droplet_values_single_frame(
             frame, config))
 
-    frame_data = np.array(frame_data)
+        convex_thresh_frames.append(convex_frame)
+        clean_thresh_frames.append(frame)
 
-    # compute velocites
+    frame_data = np.array(frame_data)
+    convex_frame_data = np.array(convex_frame_data)
+
+    # compute velocities
     com_velocity = compute_velocity(frame_data[:, 0], config)
     com_x_velocity = compute_velocity(frame_data[:, 1], config)
     tip_velocity = compute_velocity(frame_data[:, 2], config)
@@ -405,6 +493,8 @@ def process_side_video(filename, config, graphs=True):
     # remove first frame
     # compute various weber numbers
 
+    # non convex for this as this is the largest and
+    # shouldn't be affected by reflections
     diameters = frame_data[1:, 4]
     lengths = frame_data[1:, 5]
 
@@ -415,44 +505,54 @@ def process_side_video(filename, config, graphs=True):
                    (np.sqrt(1 - diameters**2/lengths)))
         + diameters)
 
+    # Only care about weber numbers for convex frame, as falling droplets
+    # are convex, this means that there are incorrect after falling
     weber_number_report = (np.pi * config.DENSITY * lengths * diameters**2 *
                            com_velocity**2 /
                            (surface_area * config.SURFACE_TENSION))
 
     weber_number_first_princ = 12 * (
-        config.DENSITY * frame_data[1:, 6] * 0.5 *
+        config.DENSITY * convex_frame_data[1:, 6] * 0.5 *
         com_velocity**2/(surface_area * config.SURFACE_TENSION))
 
     weber_number_first_princ_surface_area = 12 * (
-        config.DENSITY * frame_data[1:, 9] * 0.5 *
-        com_velocity**2/(frame_data[1:, 10] * config.SURFACE_TENSION))
+        config.DENSITY * convex_frame_data[1:, 9] * 0.5 *
+        com_velocity**2/(convex_frame_data[1:, 10] * config.SURFACE_TENSION))
 
     # full frame data contains ...
     # theres a part of me who knows how hacky this looks
     # and there's another larger part that just doesn't care
-    a = np.split(frame_data[1:, :], 11, axis=1)
-    shape = a[0].shape
 
-    full_frames_data = np.concatenate(
-        (*a,
-         com_velocity.reshape(shape), com_x_velocity.reshape(shape),
-         tip_velocity.reshape(shape), top_velocity.reshape(shape),
-         weber_number_report.reshape(shape),
-         weber_number_first_princ.reshape(shape),
-         weber_number_first_princ_surface_area.reshape(shape)), axis=1)
+    full_frames_data = {
+        'frame_data': frame_data,
+        'convex_data': convex_frame_data,
+        'weber_numbers': {
+            'report': weber_number_report,
+            'first_princ': weber_number_first_princ,
+            'first_princ_conical': weber_number_first_princ_surface_area
+        },
+        'velocities': {
+            'com': com_velocity, 'comx': com_x_velocity,
+            'top': top_velocity,
+            'tip': tip_velocity,
+        }
+    }
 
     # compute impact frame -> max tip velocity
-    pre_impact_frame = np.argmax(full_frames_data[:, 13])
+    pre_impact_frame = np.argmax(full_frames_data['velocities']['tip'])
 
-    report_weber_numbers = (full_frames_data[pre_impact_frame, 15],
-                            full_frames_data[pre_impact_frame, 16],
-                            full_frames_data[pre_impact_frame, 17])
+    report_weber_numbers = (
+        full_frames_data['weber_numbers']['report'][pre_impact_frame],
+        full_frames_data['weber_numbers']['first_princ'][pre_impact_frame],
+        full_frames_data['weber_numbers'][
+            'first_princ_conical'][pre_impact_frame])
     # this also gives the reported weber numbers
 
+    # use non convex frame to find max spread etc
     # compute max spread frame -> give max spread
-    max_spread_frame = find_dynamic_max_spread(full_frames_data,
+    max_spread_frame = find_dynamic_max_spread(frame_data,
                                                pre_impact_frame)
-    max_spread = full_frames_data[max_spread_frame, 4]
+    max_spread = frame_data[max_spread_frame, 4]
 
     # time from last pre impact frame
     time_to_max_spread = (
@@ -464,18 +564,16 @@ def process_side_video(filename, config, graphs=True):
     # due to the maximum rosensweig instabilities
 
     max_height_frame = (
-        np.argmax(full_frames_data[max_spread_frame:, 5]) +
+        np.argmax(frame_data[max_spread_frame:, 5]) +
         max_spread_frame)
 
-    max_height = full_frames_data[max_height_frame, 5]
+    max_height = frame_data[max_height_frame, 5]
     time_to_max_height = (
         max_height_frame - pre_impact_frame)/config.FRAMES_PER_SECOND
 
-    # pretty print print summary
-    # csv summary
-
     if graphs:
-        animation = display_video_with_com(frames, threshold_frames,
+        animation = display_video_with_com(frames, clean_thresh_frames,
+                                           convex_thresh_frames,
                                            full_frames_data, config)
         # draw on max spread and weber number points?
         # so this can be saved?
@@ -496,8 +594,8 @@ def process_side_video(filename, config, graphs=True):
     # add volume calculations to this output
     # first, and last pre impact
 
-    start_volume = full_frames_data[0, 9]  # using conical approximation
-    pre_impact_volume = full_frames_data[pre_impact_frame, 9]
+    start_volume = convex_frame_data[0, 9]  # using conical approximation
+    pre_impact_volume = convex_frame_data[pre_impact_frame, 9]
 
     return (pre_impact_frame + frame_offset, *report_weber_numbers,
             max_spread_frame + frame_offset, time_to_max_spread, max_spread,
@@ -507,7 +605,10 @@ def process_side_video(filename, config, graphs=True):
     # based on final values?
     # or as a function of time?
 
-print("Pre impact frame, weber number report, weber number first principles, weber number first principles cone approximation, max spread frame, time from pre impact frame to max spread frame, max spread width (m), "
-"max height frame, time to max height, max height, first calculated volume,"
-"volume calculated on the pre impact frame")
+
+print("Pre impact frame, weber number report, weber number first principles,"
+      " weber number first principles cone approximation, max spread frame, "
+      "time from pre impact frame to max spread frame, max spread width (m), "
+      "max height frame, time to max height, max height, "
+      "first calculated volume, volume calculated on the pre impact frame")
 print(process_side_video(filename, ConfigurationStephen))
