@@ -13,14 +13,24 @@ class ConfigurationGeneric(object):
     # maxiumum number of frames to consider
     MAXIMUM_FRAME_NO = 100
 
+    GET_MAX_CONTACT = False
+
+    PIXELS_TO_MM = 1
+    PIXELS_TO_METERS = PIXELS_TO_MM * 10**(-3)
     # in pixels
     MINIMUM_DROPLET_AREA = 60
 
     CONTACT_LINE_FIRST_FRAME = 2
-    CONTACT_LINE_LAST_FRAME = 7
+    CONTACT_LINE_LAST_FRAME = 10
+    FRAMES_PER_SECOND = 2000
 
-    SUBTRACT_BACKGROUND = True
+    SUBTRACT_BACKGROUND = False
     BACKGROUND_SUBTRACT_MODE = 'SUBTRACT'  # other option is 'MATCH'
+    # NOTE In this mode this will affect the overall brightness of the
+    # image and as such if this is set the threshold level will have to be
+    # set differently
+
+    BACKGROUND_MATCH_THRESHOLD = 3
 
 
 class ConfigurationStephen(ConfigurationGeneric):
@@ -33,6 +43,17 @@ class ConfigurationStephen(ConfigurationGeneric):
     PIXELS_TO_METERS = PIXELS_TO_MM * 10**(-3)
     # Conversion from pixels to meters
     # based on the slide in use
-    FRAMES_PER_SECOND = 2000
 
     SUBTRACT_BACKGROUND = False
+
+
+class ConfigurationDecember7(ConfigurationGeneric):
+
+    SUBTRACT_BACKGROUND = True
+    THRESHOLD_LEVEL = 200
+    CROP_DIMENSIONS = None
+
+    SUBTRACT_BACKGROUND = True
+    CROP_DIMENSIONS = (30, 350, 670, 850)
+
+    GET_MAX_CONTACT = True

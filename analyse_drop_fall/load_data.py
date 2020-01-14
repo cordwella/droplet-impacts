@@ -15,6 +15,7 @@ def load_data(filename, config):
     count = 0
     success = True
     calculated_starting_frame = False
+    background_image = None
 
     while success and len(frame_array) <= config.MAXIMUM_FRAME_NO:
         # write files to frames
@@ -30,7 +31,23 @@ def load_data(filename, config):
             image = image[CROP_DIMENSIONS[0]:CROP_DIMENSIONS[2],
                           CROP_DIMENSIONS[1]:CROP_DIMENSIONS[3]]
 
-        # TODO(amelia): Background subtraction ?
+        if background_image is None:
+            background_image = image
+
+        if config.SUBTRACT_BACKGROUND:
+            if config.BACKGROUND_SUBTRACT_MODE == 'MATCH':
+                # for some (read stephens) images there is significant
+                # black backgrounds in the same area as the black ferrofluid
+                # as such doing a standard subtraction itsn't great
+                # this is the best solution I have for matching them
+                # together
+                image[abs(background_image/2 - image/2) <
+                      config.BACKGROUND_MATCH_THRESHOLD] = 255
+            else:
+                # standard background subtraction
+                # divide by two as images are non negative append otherwise
+                # there are weird wrap around effects
+                image = 255 - abs(image/2 - background_image/2)
 
         threshold_image = (image < config.THRESHOLD_LEVEL).astype(int)
 
