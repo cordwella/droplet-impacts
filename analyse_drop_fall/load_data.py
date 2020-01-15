@@ -9,6 +9,7 @@ def load_data(filename, config):
     convex_frame_array = []
     contour_array = []
     frame_data_array = []
+    convex_frame_data = []
 
     vidcap = cv2.VideoCapture(filename)
 
@@ -74,14 +75,17 @@ def load_data(filename, config):
             # generic parameters to be trusted for droplet falling
             # frames only, and not for post/during impact
 
-            frame_data_array.append(compute_droplet_values_single_frame(
+            convex_frame_data.append(compute_droplet_values_single_frame(
                 convex_frame, starty, config))
+
+            frame_data_array.append(compute_droplet_values_single_frame(
+                filled_frame, starty, config))
 
         count += 1
 
     return (frame_array, threshold_frame_array,
             cleaned_frame_array, convex_frame_array, contour_array,
-            frame_data_array,
+            np.array(convex_frame_data), np.array(frame_data_array),
             calculated_starting_frame)
 
 

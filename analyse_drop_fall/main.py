@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 
-from constants import ConfigurationStephen
+import constants
 from display import (
     display_video_with_com, graph_velocities_and_length,
     display_frame_and_surrounding)
@@ -29,7 +29,8 @@ from load_data import load_data
 #   this is currently determined by
 # or do I determine this by position when
 # filename = "/home/amelia/Documents/ferrofluids/p01c2_C2.avi"
-filename = "/home/amelia/Documents/ferrofluids/from server/Magnet/Sm_16.5mm/14150(2)_C2/14150(2)_C2.avi" # noqa
+filename = "/home/amelia/Documents/ferrofluids/dist_-700_crown_C2.avi" # noqa
+# filename = "/home/amelia/Documents/ferrofluids/from server/Magnet/Sm_16.5mm/13510_C2/13510_C2.avi"
 
 plt.style.use('ggplot')
 
@@ -116,12 +117,48 @@ def get_summary_statistics(full_frames_data, config):
     pass
 
 
+def post_impact_convex_analysis(reflection_cleaned_frame, config):
+    """
+
+    returns:
+     - frame with convex version of the hull
+     - solidity rating for the droplet in this frame
+      (calculated as origional area/convex area)
+     - height of the droplet in the frame
+    """
+    cs, _ = cv2.findContours(reflection_cleaned_frame.astype('uint8'),
+                             mode=cv2.RETR_LIST,
+                             method=cv2.CHAIN_APPROX_SIMPLE)
+
+    # set up the 'ConvexImage' bit of regionprops.
+    convex_frame = np.zeros(reflection_cleaned_frame.shape[0:2]).astype('uint8')
+
+    # it is tecnhically possible to get more than one object here
+    # if e.g. the droplet splits apart
+    object_sizes = np.array([cv2.moments(c)['m00'] for c in cs])
+
+    i = np.argmax(object_sizes)
+    c = cs[i]
+
+    area = cv2.contourArea(c)
+
+    convex_hull = cv2.convexHull(c)
+    convex_area = cv2.contourArea(convex_hull)
+    solidity = area/convex_area
+
+    cv2.drawContours(convex_frame, [convex_hull], -1,
+                     color=1, thickness=-1)
+
+    height = cv2.boundingRect(c)[3] * config.PIXELS_TO_METERS
+
+    return convex_frame, solidity, height
+
+
 def process_side_video(filename, config, graphs=True):
     (frame_array, threshold_frame_array,
      cleaned_frame_array, convex_frame_array, droplet_contours,
-     convex_frame_data, frame_offset) = load_data(filename, config)
-
-    convex_frame_data = np.array(convex_frame_data)
+     convex_frame_data, frame_data, frame_offset) = load_data(
+        filename, config)
 
     # compute velocities
     com_velocity = compute_velocity(convex_frame_data[:, 0], config)
@@ -163,7 +200,8 @@ def process_side_video(filename, config, graphs=True):
     # and there's another larger part that just doesn't care
 
     full_frames_data = {
-        'frame_data': convex_frame_data,
+        'frame_data': frame_data,
+        'convex_frame_data': convex_frame_data,
         'contours': droplet_contours,
         'weber_numbers': {
             'report': weber_number_report,
@@ -208,16 +246,33 @@ def process_side_video(filename, config, graphs=True):
     # remove reflection and compute heights
     reflection_cleaned_frames = cleaned_frame_array & blackout_frame
 
+    reflection_cleaned_convex_frames = []
+    reflection_cleaned_heights = []
+    solidity = []
+
+    for frame in reflection_cleaned_frames:
+        f, solid, height = post_impact_convex_analysis(frame, config)
+        reflection_cleaned_convex_frames.append(f)
+        reflection_cleaned_heights.append(height)
+        solidity.append(solid)
+
+    full_frames_data['solidity'] = solidity
+    full_frames_data[
+        'reflect_cleaned_heights'] = reflection_cleaned_heights
+
+    # MAX SPREAD ANALYSIS
     # compute max spread frame -> give max spread
-    max_width_frame = find_dynamic_max_spread(contact_widths,
-                                              pre_impact_frame)
-    max_width = convex_frame_data[max_width_frame, 4]
+    max_spread_frame = find_dynamic_max_spread(contact_widths,
+                                               pre_impact_frame)
+    max_spread = convex_frame_data[max_spread_frame, 4]
+
+    full_frames_data['max_spread_frame'] = max_spread_frame
 
     # summary = get_summary_statistics(full_frames_data)
 
     # time from last pre impact frame
     time_to_max_width = (
-        max_width_frame - pre_impact_frame)/config.FRAMES_PER_SECOND
+        max_spread_frame - pre_impact_frame)/config.FRAMES_PER_SECOND
 
     # There are two maximums in the height
     # the first will occur before impact due to elongation
@@ -225,26 +280,27 @@ def process_side_video(filename, config, graphs=True):
     # due to the maximum rosensweig instabilities
 
     max_height_frame = (
-        np.argmax(convex_frame_data[max_width_frame:, 5]) +
-        max_width_frame)
+        np.argmax(convex_frame_data[max_spread_frame:, 5]) +
+        max_spread_frame)
 
     max_height = convex_frame_data[max_height_frame, 5]
     time_to_max_height = (
         max_height_frame - pre_impact_frame)/config.FRAMES_PER_SECOND
 
     if graphs:
-        animation = display_video_with_com(
-            (frame_array, cleaned_frame_array,
-             convex_frame_array, reflection_cleaned_frames),
-            full_frames_data, config, line=line)
+        #animation = display_video_with_com(
+        #    (frame_array, cleaned_frame_array,
+        #     convex_frame_array, reflection_cleaned_frames,
+        #     reflection_cleaned_convex_frames),
+        #    full_frames_data, config, line=line)
         # draw on max spread and weber number points?
         # so this can be saved?
         # save this in good folders?
         graph_velocities_and_length(full_frames_data, config)
 
         display_frame_and_surrounding(
-            frame_array, max_width_frame, config,
-            title="Max dynamic width frame")
+            frame_array, max_spread_frame, config,
+            title="Max spread frame")
 
         # display frames of maximum spread?
 
@@ -254,14 +310,11 @@ def process_side_video(filename, config, graphs=True):
     # number rather than the frame number of portion of the
     # video analysed
 
-    # add volume calculations to this output
-    # first, and last pre impact
-
     start_volume = convex_frame_data[0, 9]  # using conical approximation
     pre_impact_volume = convex_frame_data[pre_impact_frame, 9]
 
     return (pre_impact_frame + frame_offset, *report_weber_numbers, # noqatop
-            max_width_frame + frame_offset, time_to_max_width, max_width,
+            max_spread_frame + frame_offset, time_to_max_spread, max_spread,
             max_height_frame + frame_offset, time_to_max_height, max_height,
             start_volume, pre_impact_volume, frame_offset)
 
@@ -273,4 +326,4 @@ if __name__ == '__main__':
           "max spread width (m), max height frame, time to max height,"
           " max height, first calculated volume, volume calculated on the pre"
           " impact frame")
-    print(process_side_video(filename, ConfigurationStephen))
+    print(process_side_video(filename, constants.ConfigurationDecember7))

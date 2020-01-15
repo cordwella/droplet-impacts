@@ -207,22 +207,35 @@ def find_contact_width(threshold_frame, line, config):
     """
     Find the distance (in pixels) across the contact line of the droplet
     this doesn't require a contact angle g
-
     inputs:
         - cleaned thresholded frame
         - line defining numpy equation of the contact line, should be a
           numpy polyval
         - config
-
     output:
         - width of pixels across 'line' in pixels
     """
 
+    if config.GET_MAX_CONTACT is False:
+        return _find_contact_width(threshold_frame, line, config)
+
+    coeffs = line.c
+
+    line_above = np.poly1d([coeffs[0], coeffs[1] + 2])
+    line_below = np.poly1d([coeffs[0], coeffs[1] - 1])
+
+    widths = [_find_contact_width(threshold_frame, l, config)
+              for l in (line_above, line, line_below)]
+    return max(widths)
+
+
+def _find_contact_width(threshold_frame, line, config):
     frame_width = threshold_frame.shape[1]
 
     # defining the contact line
-    x_values = np.arange(0, frame_width - 1, 0.25)
-    y_values = line(x_values).astype(int, copy=False)  # a * x_values + b
+    x_values = np.linspace(0, frame_width - 1, 3000)
+    # standard int rounding always rounds down
+    y_values = (line(x_values) + 0.5).astype(int, copy=False)
     x_values = x_values.astype(int, copy=False)
 
     # find nonzero points on threshold frame, and external parts of
@@ -238,7 +251,11 @@ def find_contact_width(threshold_frame, line, config):
     contact_width = np.sqrt(
         (x_values[id_left_contact] - x_values[id_right_contact])**2 +
         (y_values[id_left_contact] - y_values[id_right_contact])**2)
-    return contact_width
+
+    # Add one to this number as the calculated width is between the
+    # center of each of the pixels and all other calculations calculate it
+    # from the ends of the pixels
+    return contact_width + 1
 
 
 def get_blackout_frame(shape, line, config):

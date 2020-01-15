@@ -30,7 +30,8 @@ class ConfigurationGeneric(object):
     # image and as such if this is set the threshold level will have to be
     # set differently
 
-    BACKGROUND_MATCH_THRESHOLD = 3
+    BACKGROUND_MATCH_THRESHOLD = 80
+    DISPLAY_CONTACT_LINE = True
 
 
 class ConfigurationStephen(ConfigurationGeneric):
@@ -44,7 +45,8 @@ class ConfigurationStephen(ConfigurationGeneric):
     # Conversion from pixels to meters
     # based on the slide in use
 
-    SUBTRACT_BACKGROUND = False
+    SUBTRACT_BACKGROUND = True
+    BACKGROUND_SUBTRACT_MODE = "MATCH"
 
 
 class ConfigurationDecember7(ConfigurationGeneric):
@@ -55,5 +57,6 @@ class ConfigurationDecember7(ConfigurationGeneric):
 
     SUBTRACT_BACKGROUND = True
     CROP_DIMENSIONS = (30, 350, 670, 850)
+    MAXIMUM_FRAME_NO = 100
 
-    GET_MAX_CONTACT = True
+    GET_MAX_CONTACT = False

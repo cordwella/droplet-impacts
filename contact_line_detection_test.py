@@ -16,28 +16,7 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 
-
-class ConfigurationStephen:
-    # Configurable constants
-    THRESHOLD_LEVEL = 35  # thresholding the image to pick up the drop
-    CROP_DIMENSIONS = (0, 0, 665, 350)
-    # crop the image to these dimensions
-    # (ystart, xstart, yend, xend)
-    DENSITY = 1210       # The density of the ferrofluid (kg/m^3)
-    SURFACE_TENSION = 0.026  # The surface tension of the ferrofluid
-    PIXELS_TO_MM = 0.028563817267384453
-    PIXELS_TO_METERS = PIXELS_TO_MM * 10**(-3)
-    # Conversion from pixels to meters
-    # based on the slide in use
-    FRAMES_PER_SECOND = 2000
-
-    SUBTRACT_BACKGROUND = False
-
-    # maxiumum number of frames to consider
-    MAXIMUM_FRAME_NO = 300
-
-    # in pixels
-    MINIMUM_DROPLET_AREA = 60
+from analyse_drop_fall import constants
 
 
 def find_contact_line(threshold_frame, contour, comx, config):
@@ -178,6 +157,7 @@ def open_frame(filename, frame_number, config):
 
     vidcap = cv2.VideoCapture(filename)
 
+    background_image = None
     count = -1
     success = True
 
@@ -189,6 +169,14 @@ def open_frame(filename, frame_number, config):
 
         count += 1
 
+        if background_image is None:
+            if config.CROP_DIMENSIONS is not None:
+                CROP_DIMENSIONS = config.CROP_DIMENSIONS
+                image = image[CROP_DIMENSIONS[0]:CROP_DIMENSIONS[2],
+                              CROP_DIMENSIONS[1]:CROP_DIMENSIONS[3]]
+
+            background_image = image[:, :, 0]
+
         if count != frame_number:
             continue
 
@@ -199,10 +187,16 @@ def open_frame(filename, frame_number, config):
         # be nessecary
 
         # perform image testing
-        if config.CROP_DIMENSIONS:
+        if config.CROP_DIMENSIONS is not None:
             CROP_DIMENSIONS = config.CROP_DIMENSIONS
             image = image[CROP_DIMENSIONS[0]:CROP_DIMENSIONS[2],
                           CROP_DIMENSIONS[1]:CROP_DIMENSIONS[3]]
+
+        if config.SUBTRACT_BACKGROUND:
+            if config.BACKGROUND_SUBTRACT_MODE == 'MATCH':
+                image[abs(background_image/2 - image/2) < 3] = 255
+            else:
+                image = 255 - abs(image/2 - background_image/2)
 
         threshold_frame = (image < config.THRESHOLD_LEVEL).astype(int)
 
@@ -283,9 +277,7 @@ def test_contact_line_detection(filename, frame, config):
 
     z = np.polyfit(x, y, 1)
 
-    print(z)
-
-    xp = np.linspace(0, config.CROP_DIMENSIONS[3], 100)
+    xp = np.linspace(0, threshold_frame.shape[1], 100)
     p = np.poly1d(z)
 
     frames = image, cleaned_frame
@@ -311,5 +303,5 @@ def test_contact_line_detection(filename, frame, config):
 
 if __name__ == '__main__':
     test_contact_line_detection(
-        '/home/amelia/Documents/ferrofluids/from server/Magnet/Sm_16.5mm/14150(2)_C2/14150(2)_C2.avi',
-        int(input("frame:")), ConfigurationStephen)
+        '/home/amelia/Documents/ferrofluids/dist_-700_crown_C2.avi',
+        int(input("frame:")), constants.ConfigurationDecember7)

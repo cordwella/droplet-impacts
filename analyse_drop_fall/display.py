@@ -11,9 +11,13 @@ import numpy as np
 
 
 def display_video_with_com(frame_arrays,
-                           frame_data, config):
+                           frame_data, config, line=None):
 
     fig, ax = plt.subplots(1, len(frame_arrays), sharey='all', sharex='all')
+
+    if line is not None:
+        xp = np.linspace(0, frame_arrays[0][0].shape[1] - 1, 100)
+        y = line(xp)
 
     def loop_frame(i):
         comx = frame_data['frame_data'][i, 1]/config.PIXELS_TO_METERS
@@ -21,6 +25,8 @@ def display_video_with_com(frame_arrays,
 
         for n in range(len(frame_arrays)):
             ax[n].clear()
+            if line is not None and config.DISPLAY_CONTACT_LINE:
+                ax[n].plot(xp, y, label='Contact Line')
             if n == 0:
                 # first frame is full 0 - 255
                 ax[0].imshow(frame_arrays[0][i], cmap='gray')
@@ -43,61 +49,91 @@ def display_video_with_com(frame_arrays,
 
 
 def graph_velocities_and_length(full_frame_data, config):
-    fig, ax = plt.subplots(1, 4, sharex='all')
+    fig, ax = plt.subplots(2, 3, sharex='all')
+    fig.tight_layout()
 
+    pre_impact_time = (
+        full_frame_data['pre_impact_frame']/config.FRAMES_PER_SECOND)
+    max_spread_time = (
+        full_frame_data['max_spread_frame']/config.FRAMES_PER_SECOND)
     # plot velocities as a function of time
     times = np.arange(
         len(full_frame_data['frame_data']))/config.FRAMES_PER_SECOND
     # velocity_times = times + .5/FRAMES_PER_SECOND
     velocity_times = times[1:]
-    ax[0].plot(velocity_times, full_frame_data['velocities']['com'],
-               label="CoM Velocity")
-    ax[0].plot(velocity_times, full_frame_data['velocities']['comx'],
-               label="CoM x Velocity")
-    ax[0].plot(velocity_times, full_frame_data['velocities']['tip'],
-               label="Tip Velocity")
-    ax[0].plot(velocity_times, full_frame_data['velocities']['top'],
-               label="Top Velocity")
-    ax[0].set_xlabel("Time (seconds)")
-    ax[0].set_ylabel("Velocity (meters/second)")
+    ax[0, 0].plot(velocity_times, full_frame_data['velocities']['com'],
+                  label="CoM Velocity")
+    ax[0, 0].plot(velocity_times, full_frame_data['velocities']['comx'],
+                  label="CoM x Velocity")
+    ax[0, 0].plot(velocity_times, full_frame_data['velocities']['tip'],
+                  label="Tip Velocity")
+    ax[0, 0].plot(velocity_times, full_frame_data['velocities']['top'],
+                  label="Top Velocity")
+    ax[0, 0].axvline(x=pre_impact_time, label='Pre Impact Time',
+                     color='black')
+    ax[0, 0].set_xlabel("Time (seconds)")
+    ax[0, 0].set_ylabel("Velocity (meters/second)")
 
     # TODO: subplot titles and legends
-    ax[0].set_title("Droplet velocity (m/s)")
-    ax[0].legend()
+    ax[0, 0].set_title("Droplet velocity (m/s)")
+    ax[0, 0].legend()
 
-    ax[1].plot(times, full_frame_data['frame_data'][:, 4],
-               label="Droplet Diameter")
-    ax[1].plot(times, full_frame_data['frame_data'][:, 5],
-               label="Droplet Length")
+    ax[0, 1].plot(times, full_frame_data['frame_data'][:, 4],
+                  label="Droplet Diameter")
+    # ax[0, 1].plot(times, full_frame_data['frame_data'][:, 5],
+    #           label="Droplet Length")
+    ax[0, 1].plot(times, full_frame_data['reflect_cleaned_heights'],
+                  label="Droplet Length")
 
-    ax[1].plot(times, full_frame_data['contact_width'],
-               label='Contact Width')
-    print(full_frame_data['contact_width'])
-    ax[1].set_title("Droplet size (m)")
+    ax[0, 1].plot(times, full_frame_data['contact_width'],
+                  label='Contact Width')
+    ax[0, 1].axvline(x=max_spread_time, label='Maximum Spread',
+                     color='grey')
+    ax[0, 1].axvline(x=pre_impact_time, label='Pre Impact Time',
+                     color='black')
+
+    ax[0, 1].set_title("Droplet size (m)")
     plt.axis([None, None, 0, 2e-8])
-    ax[1].legend()
+    ax[0, 1].legend()
 
-    ax[2].plot(velocity_times, full_frame_data['weber_numbers']['report'],
-               label="Weber number (report)")
-    ax[2].plot(velocity_times, full_frame_data['weber_numbers']['first_princ'],
-               label="Weber number (first principles)")
-    ax[2].plot(velocity_times,
-               full_frame_data['weber_numbers']['first_princ_conical'],
-               label="Weber number (first principles + conical area)")
+    ax[0, 2].plot(velocity_times, full_frame_data['weber_numbers']['report'],
+                  label="Weber number \n(report)")
+    ax[0, 2].plot(velocity_times, full_frame_data['weber_numbers']['first_princ'],
+                  label="Weber number \n(first principles)")
+    ax[0, 2].plot(velocity_times,
+                  full_frame_data['weber_numbers']['first_princ_conical'],
+                  label="Weber number \n(Conical area)")
+    ax[0, 2].axvline(x=pre_impact_time, label='Pre Impact Time',
+                     color='black')
 
-    ax[2].set_title("Weber Number")
-    ax[2].set_xlabel("Time (seconds)")
-    ax[2].legend()
+    ax[0, 2].set_title("Weber Number")
+    ax[0, 2].set_xlabel("Time (seconds)")
+    ax[0, 2].legend()
 
-    ax[3].plot(times, full_frame_data['frame_data'][:, 6], label="Volume")
-    ax[3].plot(times, full_frame_data['frame_data'][:, 7],
-               label="Volume (Ellipsoid)")
-    ax[3].plot(times, full_frame_data['frame_data'][:, 9],
-               label="Volume (Conical sections)")
-    ax[1].set_xlabel("Time (seconds)")
-    ax[3].legend()
+    ax[1, 0].plot(times, full_frame_data['frame_data'][:, 6], label="Volume")
+    ax[1, 0].plot(times, full_frame_data['frame_data'][:, 7],
+                  label="Volume (Ellipsoid)")
+    ax[1, 0].plot(times, full_frame_data['frame_data'][:, 9],
+                  label="Volume (Conical sections)")
+    ax[1, 0].axvline(x=pre_impact_time, label='Pre Impact Time',
+                     color='black')
 
-    ax[3].set_title("Computed Volume")
+    ax[1, 0].set_xlabel("Time (seconds)")
+    ax[1, 0].legend()
+
+    ax[1, 0].set_title("Computed Volume")
+
+    ax[1, 1].plot(times, full_frame_data['solidity'],
+                  label="Solidity (area/convex area)")
+    ax[1, 1].axvline(x=max_spread_time, label='Maximum Spread',
+                     color='grey')
+    ax[1, 1].axvline(x=pre_impact_time, label='Pre Impact Time',
+                     color='black')
+    ax[1, 1].legend()
+    # ax[1, 1].set_ylim([0, 1])
+    ax[1, 1].set_title("Solidity")
+
+    ax[1, 2].clear()
 
     # plt.show()
 

@@ -88,7 +88,7 @@ def clean_frame(threshold_frame, config):
     object_sizes = np.array([cv2.moments(c)['m00'] for c in cs])
 
     if not object_sizes.any():
-        return [], []
+        return filled_frame, convex_frame, []
     i = np.argmax(object_sizes)
 
     # print("region area", area)
