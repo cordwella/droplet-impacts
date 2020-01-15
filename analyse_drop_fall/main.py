@@ -70,46 +70,6 @@ def find_dynamic_max_spread(contact_widths, pre_impact_frame):
             pre_impact_frame:pre_impact_frame+15]) + pre_impact_frame
 
 
-def post_impact_analysis(full_frames_data, pre_impact_frame, config):
-    # find contact line (equation)
-
-    # do this based on a number of frames past the pre impact frame
-    a, b = find_equation_of_contact_line(
-        full_frames_data, pre_impact_frame, config)
-
-    # cut off the image below this
-
-    contact_widths = [0] * pre_impact_frame
-    post_impact_data = ()
-    reflection_removed = []
-    for frame in clean_thresh_frames:
-        contact_widths.append(find_contact_width(frame, a, b))
-        # update the threshold frames
-        # recompute solidity, convex outline, height
-        cleaner_thresh = clean_reflection(frame[:, :], a, b)
-        reflection_removed.append(reflection_removed)
-
-    # track contact line dynamics (width change)
-
-    contact_widths = np.array(contact_widths) * config.PIXELS_TO_MM
-
-    # remove the
-
-    # track height dynamics
-
-    # find max contact line frame
-    # find max width frame
-    # compute solidity for max contact line frame and max width frame
-    # shape analysis
-
-    # times between impact and
-    # - max spread, max width, max height, heigh stability(? how?)
-    # spread returns to max spread
-    # is the final spread max spread ?
-
-    pass
-
-
 def get_summary_statistics(full_frames_data, config):
     # sumarise:
     # solidity at max spread
@@ -131,7 +91,8 @@ def post_impact_convex_analysis(reflection_cleaned_frame, config):
                              method=cv2.CHAIN_APPROX_SIMPLE)
 
     # set up the 'ConvexImage' bit of regionprops.
-    convex_frame = np.zeros(reflection_cleaned_frame.shape[0:2]).astype('uint8')
+    convex_frame = np.zeros(
+        reflection_cleaned_frame.shape[0:2]).astype('uint8')
 
     # it is tecnhically possible to get more than one object here
     # if e.g. the droplet splits apart
@@ -149,7 +110,7 @@ def post_impact_convex_analysis(reflection_cleaned_frame, config):
     cv2.drawContours(convex_frame, [convex_hull], -1,
                      color=1, thickness=-1)
 
-    height = cv2.boundingRect(c)[3] * config.PIXELS_TO_METERS
+    height = (cv2.boundingRect(c)[3] - 1) * config.PIXELS_TO_METERS
 
     return convex_frame, solidity, height
 

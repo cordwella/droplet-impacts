@@ -255,7 +255,7 @@ def _find_contact_width(threshold_frame, line, config):
     # Add one to this number as the calculated width is between the
     # center of each of the pixels and all other calculations calculate it
     # from the ends of the pixels
-    return contact_width + 1
+    return contact_width
 
 
 def get_blackout_frame(shape, line, config):

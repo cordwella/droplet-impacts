@@ -172,8 +172,9 @@ def compute_droplet_values_single_frame(threshold_frame, starty, config):
 
     while True:
         line = threshold_frame[y_coord, :]
-        width = np.count_nonzero(line)
-        if width == 0:
+        # measure pixel to pixel distance
+        width = np.count_nonzero(line) - 1
+        if width == -1:
             # no longer counting the actual size
             break
         if width > max_width:
@@ -217,7 +218,7 @@ def compute_droplet_values_single_frame(threshold_frame, starty, config):
     volume_cone += dV_conical
 
     # full length of the droplet
-    length = starty - y_coord
+    length = starty - y_coord - 1
 
     # other volume option -> model as an ellipsoid
 
