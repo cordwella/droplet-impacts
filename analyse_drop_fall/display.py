@@ -14,6 +14,7 @@ def display_video_with_com(frame_arrays,
                            frame_data, config, line=None):
 
     fig, ax = plt.subplots(1, len(frame_arrays), sharey='all', sharex='all')
+    plt.tight_layout()
 
     if line is not None:
         xp = np.linspace(0, frame_arrays[0][0].shape[1] - 1, 100)
@@ -96,19 +97,19 @@ def graph_velocities_and_length(full_frame_data, config):
     plt.axis([None, None, 0, 2e-8])
     ax[0, 1].legend()
 
-    ax[0, 2].plot(velocity_times, full_frame_data['weber_numbers']['report'],
+    ax[1, 1].plot(velocity_times, full_frame_data['weber_numbers']['report'],
                   label="Weber number \n(report)")
-    ax[0, 2].plot(velocity_times, full_frame_data['weber_numbers']['first_princ'],
+    ax[1, 1].plot(velocity_times, full_frame_data['weber_numbers']['first_princ'],
                   label="Weber number \n(first principles)")
-    ax[0, 2].plot(velocity_times,
+    ax[1, 1].plot(velocity_times,
                   full_frame_data['weber_numbers']['first_princ_conical'],
                   label="Weber number \n(Conical area)")
-    ax[0, 2].axvline(x=pre_impact_time, label='Pre Impact Time',
+    ax[1, 1].axvline(x=pre_impact_time, label='Pre Impact Time',
                      color='black')
 
-    ax[0, 2].set_title("Weber Number")
-    ax[0, 2].set_xlabel("Time (seconds)")
-    ax[0, 2].legend()
+    ax[1, 1].set_title("Weber Number")
+    ax[1, 1].set_xlabel("Time (seconds)")
+    ax[1, 1].legend()
 
     ax[1, 0].plot(times, full_frame_data['frame_data'][:, 6], label="Volume")
     ax[1, 0].plot(times, full_frame_data['frame_data'][:, 7],
@@ -123,15 +124,15 @@ def graph_velocities_and_length(full_frame_data, config):
 
     ax[1, 0].set_title("Computed Volume")
 
-    ax[1, 1].plot(times, full_frame_data['solidity'],
+    ax[0, 2].plot(times, full_frame_data['solidity'],
                   label="Solidity (area/convex area)")
-    ax[1, 1].axvline(x=max_spread_time, label='Maximum Spread',
+    ax[0, 2].axvline(x=max_spread_time, label='Maximum Spread',
                      color='grey')
-    ax[1, 1].axvline(x=pre_impact_time, label='Pre Impact Time',
+    ax[0, 2].axvline(x=pre_impact_time, label='Pre Impact Time',
                      color='black')
-    ax[1, 1].legend()
+    ax[0, 2].legend()
     # ax[1, 1].set_ylim([0, 1])
-    ax[1, 1].set_title("Solidity")
+    ax[0, 2].set_title("Solidity")
 
     ax[1, 2].clear()
 

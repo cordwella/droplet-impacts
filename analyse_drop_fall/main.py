@@ -4,6 +4,9 @@ Description: Analysis and graphing code for the side view of a falling
 ferrofluid droplet.
 """
 
+import pickle
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
@@ -17,9 +20,6 @@ from contact_line import (find_equation_of_contact_line,
 from load_data import load_data
 
 
-# Later on this should be stdin, or called from an actual function#
-# videodirectory = input("Enter video directory" )
-
 # TODO(amelia): test the surface area calculations against known 'perfect'
 # shapes and generate videos
 # build checking for when the drop is falling DONE
@@ -29,10 +29,8 @@ from load_data import load_data
 #   this is currently determined by
 # or do I determine this by position when
 # filename = "/home/amelia/Documents/ferrofluids/p01c2_C2.avi"
-filename = "/home/amelia/Documents/ferrofluids/dist_-700_crown_C2.avi" # noqa
-# filename = "/home/amelia/Documents/ferrofluids/from server/Magnet/Sm_16.5mm/13510_C2/13510_C2.avi"
 
-plt.style.use('ggplot')
+# plt.style.use('ggplot')
 
 
 def compute_velocity(positions, config):
@@ -68,13 +66,6 @@ def find_dynamic_max_spread(contact_widths, pre_impact_frame):
     """
     return np.argmax(contact_widths[
             pre_impact_frame:pre_impact_frame+15]) + pre_impact_frame
-
-
-def get_summary_statistics(full_frames_data, config):
-    # sumarise:
-    # solidity at max spread
-
-    pass
 
 
 def post_impact_convex_analysis(reflection_cleaned_frame, config):
@@ -115,7 +106,95 @@ def post_impact_convex_analysis(reflection_cleaned_frame, config):
     return convex_frame, solidity, height
 
 
-def process_side_video(filename, config, graphs=True):
+def summarise_data(full_frames_data, config):
+    """
+    Return a one line summary of the data useful for processing with
+    different scripts or in a spreadsheeting program
+
+    returns
+    at start:
+        - volume
+    at pre impact:
+        - weber numbers pre impact
+        - CoM velocity
+        - volume
+        - solidity
+        - frame number
+    at max spread:
+        - max spread
+        - solidity
+        - height
+        - time from pre impact
+        - frame number
+
+    various times:
+        - report time from pre impact frame, height, contact width,
+          solidity, frame no
+        - contact width > max spread again
+        - contact width minimum
+        - max rosensweig height
+        - final frame
+    """
+
+    """ 0 frame, 0 time, 0 length, 0 contact width, 0 width, 0 solidity, 0 volume,
+       pre frame, pre time, pre length, pre contact width, pre width, pre solidity, pre volume
+       pre com v, pre weber,
+       max spread frame, spread time, spread height, spread contact width, spread max width, spread solidity,
+     """
+
+    first_frame = summarise_frame_data(full_frames_data, 0, config)
+    first_frame.append(full_frames_data['frame_data'][0, 9])
+    # which ever number gives standard volume
+    # TODO
+
+    pre_impact = summarise_frame_data(
+        full_frames_data, full_frames_data['pre_impact_frame'], config)
+    pre_impact.append(
+        full_frames_data['frame_data'][full_frames_data['pre_impact_frame'],
+                                       9])  # volume
+    pre_impact.append(
+        full_frames_data['velocities']['com'][
+            full_frames_data['pre_impact_frame']])
+
+    pre_impact.append(
+        full_frames_data['weber_numbers']['first_princ_conical'][
+            full_frames_data['pre_impact_frame']])
+
+    # pre impact . append VELOCITY and WEBER NUMBERs
+    # NOTE which weber number is the best ???
+    # first princ conical -> but also ask
+
+    max_spread = summarise_frame_data(
+        full_frames_data, full_frames_data['max_spread_frame'], config)
+
+    summary = first_frame + pre_impact + max_spread
+
+    # TODO: In future at this I could also look at
+    # specific interesting points, ie max height etc
+    # however this depends on the regime that the droplet
+    # is in and as such without further more qualitative study
+    # i cannot do this
+
+    return summary
+
+
+def summarise_frame_data(full_frames_data, frame_number, config,):
+    """
+    return for specified frame
+    time, since pre impact frame, height, contact width, solidity
+    """
+    time = (frame_number -
+            full_frames_data['pre_impact_frame'])/config.FRAMES_PER_SECOND
+
+    height = full_frames_data['frame_data'][frame_number, 4]
+    contact_width = full_frames_data['contact_width'][frame_number]
+    max_width = full_frames_data['frame_data'][frame_number, 5]
+    solidity = full_frames_data['solidity'][frame_number]
+
+    return [frame_number, time, height, contact_width, max_width, solidity]
+
+
+def process_side_video(filename, config, graphs=True, save_filename=None):
     (frame_array, threshold_frame_array,
      cleaned_frame_array, convex_frame_array, droplet_contours,
      convex_frame_data, frame_data, frame_offset) = load_data(
@@ -180,11 +259,6 @@ def process_side_video(filename, config, graphs=True):
     pre_impact_frame = np.argmax(full_frames_data['velocities']['tip'])
     full_frames_data['pre_impact_frame'] = pre_impact_frame
 
-    report_weber_numbers = (
-        full_frames_data['weber_numbers']['report'][pre_impact_frame],
-        full_frames_data['weber_numbers']['first_princ'][pre_impact_frame],
-        full_frames_data['weber_numbers'][
-            'first_princ_conical'][pre_impact_frame])
     # this also gives the reported weber numbers
 
     # compute other stuff
@@ -225,35 +299,22 @@ def process_side_video(filename, config, graphs=True):
     # compute max spread frame -> give max spread
     max_spread_frame = find_dynamic_max_spread(contact_widths,
                                                pre_impact_frame)
-    max_spread = convex_frame_data[max_spread_frame, 4]
 
     full_frames_data['max_spread_frame'] = max_spread_frame
 
-    # summary = get_summary_statistics(full_frames_data)
-
-    # time from last pre impact frame
-    time_to_max_width = (
-        max_spread_frame - pre_impact_frame)/config.FRAMES_PER_SECOND
+    summary = summarise_data(full_frames_data, config)
 
     # There are two maximums in the height
     # the first will occur before impact due to elongation
     # and the second will occur either due to the splash or
     # due to the maximum rosensweig instabilities
 
-    max_height_frame = (
-        np.argmax(convex_frame_data[max_spread_frame:, 5]) +
-        max_spread_frame)
-
-    max_height = convex_frame_data[max_height_frame, 5]
-    time_to_max_height = (
-        max_height_frame - pre_impact_frame)/config.FRAMES_PER_SECOND
-
     if graphs:
-        #animation = display_video_with_com(
-        #    (frame_array, cleaned_frame_array,
-        #     convex_frame_array, reflection_cleaned_frames,
-        #     reflection_cleaned_convex_frames),
-        #    full_frames_data, config, line=line)
+        animation = display_video_with_com(
+            (frame_array, cleaned_frame_array,
+             convex_frame_array, reflection_cleaned_frames,
+             reflection_cleaned_convex_frames),
+            full_frames_data, config, line=line)
         # draw on max spread and weber number points?
         # so this can be saved?
         # save this in good folders?
@@ -267,24 +328,14 @@ def process_side_video(filename, config, graphs=True):
 
         plt.show()
 
-    # the frame offset gives the frame in terms of the video frame
-    # number rather than the frame number of portion of the
-    # video analysed
+    if not os.path.exists(os.path.dirname(save_filename)):
+        os.makedirs(os.path.dirname(save_filename))
+    if save_filename:
+        with open(save_filename, "wb") as f:
+            pickle.dump(full_frames_data, f)
 
-    start_volume = convex_frame_data[0, 9]  # using conical approximation
-    pre_impact_volume = convex_frame_data[pre_impact_frame, 9]
-
-    return (pre_impact_frame + frame_offset, *report_weber_numbers, # noqatop
-            max_spread_frame + frame_offset, time_to_max_spread, max_spread,
-            max_height_frame + frame_offset, time_to_max_height, max_height,
-            start_volume, pre_impact_volume, frame_offset)
+    return (summary, frame_offset)
 
 
 if __name__ == '__main__':
-    print("Pre impact frame, weber number report, weber number first "
-          "principles, weber number first principles cone approximation, "
-          "max spread frame, time from pre impact frame to max spread frame, "
-          "max spread width (m), max height frame, time to max height,"
-          " max height, first calculated volume, volume calculated on the pre"
-          " impact frame")
-    print(process_side_video(filename, constants.ConfigurationDecember7))
+    print(process_side_video("/home/amelia/Documents/ferrofluids/big data/videos/amelia/9-dec/SM_20mm_sd/dist_-700_crown_C2/dist_-700_crown_C2.avi", constants.ConfigurationDecember7))

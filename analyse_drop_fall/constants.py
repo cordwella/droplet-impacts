@@ -33,6 +33,8 @@ class ConfigurationGeneric(object):
     BACKGROUND_MATCH_THRESHOLD = 80
     DISPLAY_CONTACT_LINE = True
 
+    FULL_SUMMARY = False
+
 
 class ConfigurationStephen(ConfigurationGeneric):
     # Configurable constants
@@ -49,14 +51,38 @@ class ConfigurationStephen(ConfigurationGeneric):
     BACKGROUND_SUBTRACT_MODE = "MATCH"
 
 
-class ConfigurationDecember7(ConfigurationGeneric):
+class ConfigurationDecember9(ConfigurationGeneric):
+    THRESHOLD_LEVEL = 200
+    CROP_DIMENSIONS = None
+
+    SUBTRACT_BACKGROUND = True
+    CROP_DIMENSIONS = (30, 350, 670, 850)
+    MAXIMUM_FRAME_NO = 100
+
+    GET_MAX_CONTACT = False
+
+    PIXELS_TO_MM = 1/39.27
+    PIXELS_TO_METERS = PIXELS_TO_MM * 10**(-3)
+
+    TOPDOWN_PIXELS_TO_MM = None
+
+    # folder name, field strength in tesla
+    MAGNETIC_FIELDS = {
+        "SM_6.5mm_sd": 0.06955612718798337,
+        "SM_11.5mm_sd": 0.04144297306689245,
+        "SM_20mm_sd": 0.02171298130249175,
+        "SM_54.55mm_sd": 0.0034110974759958626
+    }
+
+
+class ConfigurationJan9(ConfigurationGeneric):
 
     SUBTRACT_BACKGROUND = True
     THRESHOLD_LEVEL = 200
     CROP_DIMENSIONS = None
 
     SUBTRACT_BACKGROUND = True
-    CROP_DIMENSIONS = (30, 350, 670, 850)
+    CROP_DIMENSIONS = (30, 170, 650, 700)
     MAXIMUM_FRAME_NO = 100
 
     GET_MAX_CONTACT = False

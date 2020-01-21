@@ -181,19 +181,11 @@ def find_contact_points(contour, config):
 
     if not left_contact_points or not right_contact_points:
         print("Unable to find contact points with angle > 90")
-        if left_contact_points:
-            print("left", left_contact_points)
-        if right_contact_points:
-            print("right", right_contact_points)
         return None, None, None
-
-    print("Left", left_contact_points)
-    print("Right", right_contact_points)
 
     contact_width = np.sqrt(
         (left_contact_points[1][0] - right_contact_points[1][0])**2 +
         (left_contact_points[1][1] - right_contact_points[1][1])**2)
-    print("contact pixel width", contact_width)
     contact_width = contact_width * config.PIXELS_TO_METERS
 
     # NOTE(amelia): I would also like to return contact angle
