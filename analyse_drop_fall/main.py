@@ -256,8 +256,12 @@ def process_side_video(filename, config, graphs=True, save_filename=None):
     }
 
     # compute impact frame -> max tip velocity
+    # get last maximum value
+    # TODO(amelia): document this properly
     pre_impact_frame = np.argmax(full_frames_data['velocities']['tip'])
-    full_frames_data['pre_impact_frame'] = pre_impact_frame
+    b = full_frames_data['velocities']['tip'][::-1]
+    pre_impact_frame = len(b) - np.argmax(b) - 1
+
 
     # this also gives the reported weber numbers
 
@@ -270,6 +274,10 @@ def process_side_video(filename, config, graphs=True, save_filename=None):
         droplet_contours, pre_impact_frame, config, return_points=True)
 
     contact_widths = []
+    if line is None:
+        # make line instead the bottom of the frame
+        line = np.poly1d([0, cleaned_frame_array[0].shape[0] - 1])
+    full_frames_data['contact_line'] = line
     for frame in cleaned_frame_array:
         contact_widths.append(find_contact_width(frame, line, config))
 
@@ -277,6 +285,18 @@ def process_side_video(filename, config, graphs=True, save_filename=None):
         np.array(contact_widths) * config.PIXELS_TO_METERS)
 
     blackout_frame = get_blackout_frame(frame_array[0].shape, line, config)
+
+    # check if the pre contact tip position is within blackout
+    # if it is then check the previous one
+    # and so forth until it finds one it's not
+    # pick that frame as the pre impact frame
+
+    center = int(frame_array[0].shape[1]/2)
+    while (blackout_frame[int(convex_frame_data[pre_impact_frame + 1, 2] /
+                              config.PIXELS_TO_METERS), center] == 0):
+        pre_impact_frame = pre_impact_frame - 1
+
+    full_frames_data['pre_impact_frame'] = pre_impact_frame
 
     # remove reflection and compute heights
     reflection_cleaned_frames = cleaned_frame_array & blackout_frame
@@ -328,9 +348,9 @@ def process_side_video(filename, config, graphs=True, save_filename=None):
 
         plt.show()
 
-    if not os.path.exists(os.path.dirname(save_filename)):
-        os.makedirs(os.path.dirname(save_filename))
     if save_filename:
+        if not os.path.exists(os.path.dirname(save_filename)):
+            os.makedirs(os.path.dirname(save_filename))
         with open(save_filename, "wb") as f:
             pickle.dump(full_frames_data, f)
 

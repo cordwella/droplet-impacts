@@ -34,22 +34,26 @@ def find_equation_of_contact_line(contours, pre_impact_frame,
     contact_points_y = []
 
     for frame in frames_to_use:
-        width, left, right = find_contact_points(contours[frame], config)
+        try:
+            width, left, right = find_contact_points(contours[frame], config)
+        except IndexError:
+            break
         if width:
             contact_points_x.append(left[0])
             contact_points_x.append(right[0])
 
             contact_points_y.append(left[1])
             contact_points_y.append(left[1])
-        else:
-            pass
 
-    z = np.polyfit(contact_points_x, contact_points_y, 1)
+    if len(contact_points_x) == 0:
+        z = None
+    else:
+        z = np.poly1d(np.polyfit(contact_points_x, contact_points_y, 1))
 
     if return_points:
-        return np.poly1d(z), contact_points_x, contact_points_y
+        return z, contact_points_x, contact_points_y
 
-    return np.poly1d(z)
+    return z
 
 
 def find_contact_points(contour, config):
