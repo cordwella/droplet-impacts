@@ -114,8 +114,11 @@ def summarise_data(full_frames_data, config):
     returns
     at start:
         - volume
+        - surface area
+        - velocity
     at pre impact:
         - weber numbers pre impact
+        - surface area
         - CoM velocity
         - volume
         - solidity
@@ -126,10 +129,13 @@ def summarise_data(full_frames_data, config):
         - height
         - time from pre impact
         - frame number
+    at max diameter
+        - same as maximum spread
 
-    various times:
+
+    various times (not yet):
         - report time from pre impact frame, height, contact width,
-          solidity, frame no
+          solidity, frame no 200
         - contact width > max spread again
         - contact width minimum
         - max rosensweig height
@@ -143,7 +149,10 @@ def summarise_data(full_frames_data, config):
      """
 
     first_frame = summarise_frame_data(full_frames_data, 0, config)
-    first_frame.append(full_frames_data['frame_data'][0, 9])
+    first_frame.append(full_frames_data['convex_frame_data'][0, 9])  # volume
+    # conically calculated surface area
+    first_frame.append(full_frames_data['convex_frame_data'][0, 10])
+
     # which ever number gives standard volume
     # TODO
 
@@ -153,11 +162,29 @@ def summarise_data(full_frames_data, config):
         full_frames_data['frame_data'][full_frames_data['pre_impact_frame'],
                                        9])  # volume
     pre_impact.append(
+        full_frames_data['frame_data'][full_frames_data['pre_impact_frame'],
+                                       10])  # surface area
+
+    pre_impact.append(
         full_frames_data['velocities']['com'][
+            full_frames_data['pre_impact_frame']])
+    pre_impact.append(
+        full_frames_data['velocities']['tip'][
+            full_frames_data['pre_impact_frame']])
+    print('Pre impact velocity', full_frames_data['velocities']['com'][
+        full_frames_data['pre_impact_frame']])
+
+    # standard weber number
+    pre_impact.append(
+        full_frames_data['weber_numbers']['first_princ_conical'][
+            full_frames_data['pre_impact_frame']])
+    #
+    pre_impact.append(
+        full_frames_data['weber_numbers']['fixed_volume'][
             full_frames_data['pre_impact_frame']])
 
     pre_impact.append(
-        full_frames_data['weber_numbers']['first_princ_conical'][
+        full_frames_data['weber_numbers']['tip'][
             full_frames_data['pre_impact_frame']])
 
     # pre impact . append VELOCITY and WEBER NUMBERs
@@ -166,8 +193,10 @@ def summarise_data(full_frames_data, config):
 
     max_spread = summarise_frame_data(
         full_frames_data, full_frames_data['max_spread_frame'], config)
+    max_diameter = summarise_frame_data(
+        full_frames_data, full_frames_data['max_diameter_frame'], config)
 
-    summary = first_frame + pre_impact + max_spread
+    summary = first_frame + pre_impact + max_spread + max_diameter
 
     # TODO: In future at this I could also look at
     # specific interesting points, ie max height etc
@@ -212,28 +241,21 @@ def process_side_video(filename, config, graphs=True, save_filename=None):
     # non convex for this as this is the largest and
     # shouldn't be affected by reflections
     diameters = convex_frame_data[1:, 4]
-    lengths = convex_frame_data[1:, 5]
-
-    # TODO(amelia): Clean this mess up
-    # although that might mean changing the way the calculation works
-    surface_area = np.pi * diameters/2 * (
-        lengths * ((np.arcsin(np.sqrt(1 - diameters**2/lengths))) /
-                   (np.sqrt(1 - diameters**2/lengths)))
-        + diameters)
 
     # Only care about weber numbers for convex frame, as falling droplets
     # are convex, this means that there are incorrect after falling
-    weber_number_report = (np.pi * config.DENSITY * lengths * diameters**2 *
-                           com_velocity**2 /
-                           (surface_area * config.SURFACE_TENSION))
-
-    weber_number_first_princ = 12 * (
-        config.DENSITY * convex_frame_data[1:, 6] * 0.5 *
-        com_velocity**2/(surface_area * config.SURFACE_TENSION))
 
     weber_number_first_princ_surface_area = 12 * (
         config.DENSITY * convex_frame_data[1:, 9] * 0.5 *
         com_velocity**2/(convex_frame_data[1:, 10] * config.SURFACE_TENSION))
+
+    weber_number_fixed_volume = 12 * (
+        config.DENSITY * convex_frame_data[0, 9] * 0.5 *
+        com_velocity**2/(convex_frame_data[1:, 10] * config.SURFACE_TENSION))
+
+    weber_number_tip = 12 * (
+        config.DENSITY * convex_frame_data[0, 9] * 0.5 *
+        tip_velocity**2/(convex_frame_data[1:, 10] * config.SURFACE_TENSION))
 
     # full frame data contains ...
     # theres a part of me who knows how hacky this looks
@@ -244,9 +266,9 @@ def process_side_video(filename, config, graphs=True, save_filename=None):
         'convex_frame_data': convex_frame_data,
         'contours': droplet_contours,
         'weber_numbers': {
-            'report': weber_number_report,
-            'first_princ': weber_number_first_princ,
-            'first_princ_conical': weber_number_first_princ_surface_area
+            'first_princ_conical': weber_number_first_princ_surface_area,
+            'fixed_volume': weber_number_fixed_volume,
+            'tip': weber_number_tip,
         },
         'velocities': {
             'com': com_velocity, 'comx': com_x_velocity,
@@ -261,7 +283,6 @@ def process_side_video(filename, config, graphs=True, save_filename=None):
     pre_impact_frame = np.argmax(full_frames_data['velocities']['tip'])
     b = full_frames_data['velocities']['tip'][::-1]
     pre_impact_frame = len(b) - np.argmax(b) - 1
-
 
     # this also gives the reported weber numbers
 
@@ -320,7 +341,11 @@ def process_side_video(filename, config, graphs=True, save_filename=None):
     max_spread_frame = find_dynamic_max_spread(contact_widths,
                                                pre_impact_frame)
 
+    max_diameter_frame = find_dynamic_max_spread(diameters,
+                                                 pre_impact_frame)
+
     full_frames_data['max_spread_frame'] = max_spread_frame
+    full_frames_data['max_diameter_frame'] = max_diameter_frame
 
     summary = summarise_data(full_frames_data, config)
 
@@ -335,16 +360,16 @@ def process_side_video(filename, config, graphs=True, save_filename=None):
              convex_frame_array, reflection_cleaned_frames,
              reflection_cleaned_convex_frames),
             full_frames_data, config, line=line)
-        # draw on max spread and weber number points?
-        # so this can be saved?
-        # save this in good folders?
-        graph_velocities_and_length(full_frames_data, config)
 
         display_frame_and_surrounding(
             frame_array, max_spread_frame, config,
-            title="Max spread frame")
+            title="Maximum spread frame")
 
-        # display frames of maximum spread?
+        display_frame_and_surrounding(
+            frame_array, max_diameter_frame, config,
+            title="Maximum Diameter Frame")
+
+        graph_velocities_and_length(full_frames_data, config)
 
         plt.show()
 

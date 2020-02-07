@@ -45,23 +45,25 @@ def display_video_with_com(frame_arrays,
             ax[n].set_title(i)
 
     ani = animation.FuncAnimation(fig, loop_frame, frames=len(frame_arrays[0]) - 1,  # noqa
-                                  interval=50)
+                                  interval=25)
     return ani
 
 
 def graph_velocities_and_length(full_frame_data, config):
-    fig, ax = plt.subplots(2, 3, sharex='all')
+    fig, ax = plt.subplots(2, 3) #, sharex='all')
     fig.tight_layout()
 
     pre_impact_time = (
         full_frame_data['pre_impact_frame']/config.FRAMES_PER_SECOND)
     max_spread_time = (
         full_frame_data['max_spread_frame']/config.FRAMES_PER_SECOND)
+    max_diameter_time = (
+        full_frame_data['max_diameter_frame']/config.FRAMES_PER_SECOND)
     # plot velocities as a function of time
     times = np.arange(
-        len(full_frame_data['frame_data']))/config.FRAMES_PER_SECOND
-    # velocity_times = times + .5/FRAMES_PER_SECOND
-    velocity_times = times[1:]
+        0, len(full_frame_data['frame_data']), 1)/config.FRAMES_PER_SECOND
+    # velocity_times = times
+    velocity_times = times[:-1] #  + .5/config.FRAMES_PER_SECOND
     ax[0, 0].plot(velocity_times, full_frame_data['velocities']['com'],
                   label="CoM Velocity")
     ax[0, 0].plot(velocity_times, full_frame_data['velocities']['comx'],
@@ -84,26 +86,32 @@ def graph_velocities_and_length(full_frame_data, config):
     # ax[0, 1].plot(times, full_frame_data['frame_data'][:, 5],
     #           label="Droplet Length")
     ax[0, 1].plot(times, full_frame_data['reflect_cleaned_heights'],
-                  label="Droplet Length")
+                  label="Droplet Length / Height")
 
     ax[0, 1].plot(times, full_frame_data['contact_width'],
                   label='Contact Width')
     ax[0, 1].axvline(x=max_spread_time, label='Maximum Spread',
                      color='grey')
+    ax[0, 1].axvline(x=max_diameter_time, label='Maximum Diameter',
+                     color='#a0a0a0')
     ax[0, 1].axvline(x=pre_impact_time, label='Pre Impact Time',
                      color='black')
+    ax[0, 1].set_xlabel("Time (seconds)")
+    ax[0, 1].set_ylabel("Length (meters)")
 
     ax[0, 1].set_title("Droplet size (m)")
     plt.axis([None, None, 0, 2e-8])
     ax[0, 1].legend()
 
-    ax[1, 1].plot(velocity_times, full_frame_data['weber_numbers']['report'],
-                  label="Weber number \n(report)")
-    ax[1, 1].plot(velocity_times, full_frame_data['weber_numbers']['first_princ'],
-                  label="Weber number \n(first principles)")
     ax[1, 1].plot(velocity_times,
                   full_frame_data['weber_numbers']['first_princ_conical'],
                   label="Weber number \n(Conical area)")
+    ax[1, 1].plot(velocity_times,
+                  full_frame_data['weber_numbers']['fixed_volume'],
+                  label="Weber number \n(Fixed Volume)")
+    ax[1, 1].plot(velocity_times,
+                  full_frame_data['weber_numbers']['tip'],
+                  label="Weber number \n(Tip Velocity)")
     ax[1, 1].axvline(x=pre_impact_time, label='Pre Impact Time',
                      color='black')
 
@@ -140,20 +148,23 @@ def graph_velocities_and_length(full_frame_data, config):
 
 
 def display_frame_and_surrounding(frames, frame_number, config, title=None):
-    fig, ax = plt.subplots(1, 5, sharey='all', sharex='all')
+    fig, ax = plt.subplots(1, 6, sharey='all', sharex='all')
 
     ax[0].imshow(frames[frame_number - 3], cmap='gray')
     ax[0].set_title("3 behind")
 
-    ax[1].imshow(frames[frame_number], cmap='gray')
+    ax[1].imshow(frames[frame_number - 2], cmap='gray')
+    ax[1].set_title("2 behind")
+
+    ax[2].imshow(frames[frame_number - 2], cmap='gray')
+    ax[2].set_title("1 behind")
+
+    ax[3].imshow(frames[frame_number], cmap='gray')
     if title is not None:
-        ax[1].set_title(title)
+        ax[3].set_title(title)
 
-    ax[2].imshow(frames[frame_number + 3], cmap='gray')
-    ax[2].set_title("3 ahead")
+    ax[4].imshow(frames[frame_number + 1], cmap='gray')
+    ax[4].set_title("1 ahead")
 
-    ax[3].imshow(frames[frame_number + 5], cmap='gray')
-    ax[3].set_title("5 ahead")
-
-    ax[4].imshow(frames[frame_number + 9], cmap='gray')
-    ax[4].set_title("9 ahead")
+    ax[5].imshow(frames[frame_number + 3], cmap='gray')
+    ax[5].set_title("3 ahead")
