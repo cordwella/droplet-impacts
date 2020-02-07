@@ -55,31 +55,50 @@ def load_data(filename, config):
         if (not calculated_starting_frame and threshold_image.any()
                 and not threshold_image[0, :].any()):
             # there is a droplet in the frame and it is full in the frame
-            calculated_starting_frame = count
-
-        if calculated_starting_frame:
-            # check for emptiness in the threshold image
-            frame_array.append(image)
-            threshold_frame_array.append(threshold_image)
             filled_frame, convex_frame, contour = clean_frame(
                 threshold_image, config)
 
-            starty = (cv2.boundingRect(contour)[1]
-                      + cv2.boundingRect(contour)[3] - 1)
+            if len(contour) != 0 and cv2.contourArea(contour) >= config.MINIMUM_DROPLET_AREA:
+                calculated_starting_frame = count
 
-            cleaned_frame_array.append(filled_frame)
-            convex_frame_array.append(convex_frame)
-            contour_array.append(contour)
+        if calculated_starting_frame:
+            # check for emptiness in the threshold image
+            filled_frame, convex_frame, contour = clean_frame(
+                threshold_image, config)
 
-            # generic parameters (for convex frame)
-            # generic parameters to be trusted for droplet falling
-            # frames only, and not for post/during impact
+            if len(contour) == 0 and len(frame_array) <= 1:
+                frame_array = []
+                threshold_frame_array = []
+                convex_frame_array = []
+                contour_array = []
+                convex_frame_data = []
+                frame_data_array = []
+                calculated_starting_frame = None
+            elif len(contour) == 0:
+                return (frame_array, threshold_frame_array,
+                        cleaned_frame_array, convex_frame_array, contour_array,
+                        np.array(convex_frame_data), np.array(frame_data_array),
+                        calculated_starting_frame)
+            else:
+                frame_array.append(image)
+                threshold_frame_array.append(threshold_image)
 
-            convex_frame_data.append(compute_droplet_values_single_frame(
-                convex_frame, starty, config))
+                starty = (cv2.boundingRect(contour)[1]
+                          + cv2.boundingRect(contour)[3] - 1)
 
-            frame_data_array.append(compute_droplet_values_single_frame(
-                filled_frame, starty, config))
+                cleaned_frame_array.append(filled_frame)
+                convex_frame_array.append(convex_frame)
+                contour_array.append(contour)
+
+                # generic parameters (for convex frame)
+                # generic parameters to be trusted for droplet falling
+                # frames only, and not for post/during impact
+
+                convex_frame_data.append(compute_droplet_values_single_frame(
+                    convex_frame, starty, config))
+
+                frame_data_array.append(compute_droplet_values_single_frame(
+                    filled_frame, starty, config))
 
         count += 1
 
