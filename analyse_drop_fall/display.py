@@ -43,9 +43,13 @@ def display_video_with_com(frame_arrays,
 
             ax[n].legend(loc='upper left')
             ax[n].set_title(i)
+    # peaks = frame_data[peaks]
+    # on the clean heights include the peaks
+    # ax[3].scatter()
+
 
     ani = animation.FuncAnimation(fig, loop_frame, frames=len(frame_arrays[0]) - 1,  # noqa
-                                  interval=25)
+                                  interval=30)
     return ani
 
 
@@ -85,7 +89,7 @@ def graph_velocities_and_length(full_frame_data, config):
                   label="Droplet Diameter")
     # ax[0, 1].plot(times, full_frame_data['frame_data'][:, 5],
     #           label="Droplet Length")
-    ax[0, 1].plot(times, full_frame_data['reflect_cleaned_heights'],
+    ax[0, 1].plot(times, full_frame_data['reflection_cleaned_heights'],
                   label="Droplet Length / Height")
 
     ax[0, 1].plot(times, full_frame_data['contact_width'],
@@ -100,7 +104,7 @@ def graph_velocities_and_length(full_frame_data, config):
     ax[0, 1].set_ylabel("Length (meters)")
 
     ax[0, 1].set_title("Droplet size (m)")
-    plt.axis([None, None, 0, 2e-8])
+    # plt.axis([None, None, 0, 2e-8])
     ax[0, 1].legend()
 
     ax[1, 1].plot(velocity_times,
@@ -142,7 +146,25 @@ def graph_velocities_and_length(full_frame_data, config):
     # ax[1, 1].set_ylim([0, 1])
     ax[0, 2].set_title("Solidity")
 
-    ax[1, 2].clear()
+    # graph roughness as a function of time
+
+    ax[1, 2].set_xlabel("Time (seconds)")
+    #ax[1, 2].set_ylabel("Roughness (mm)")
+
+    ax[1, 2].plot(times, full_frame_data['mean_roughness'],
+                  label="Mean surface roughness")
+    ax[1, 2].plot(times, full_frame_data['rms_roughness'],
+                  label="RMS surface roughness")
+    #ax[1, 2].plot(times, full_frame_data['mean_height'],
+    #              label="Mean height")
+    ax[1, 2].axvline(x=max_spread_time, label='Maximum Spread',
+                     color='grey')
+    ax[1, 2].axvline(x=pre_impact_time, label='Pre Impact Time',
+                     color='black')
+    ax[1, 2].legend()
+
+    #ax[1, 2].set_ylabel("Peak count")
+    #ax[1, 2].plot(times, full_frame_data['peak_count'])
 
     # plt.show()
 

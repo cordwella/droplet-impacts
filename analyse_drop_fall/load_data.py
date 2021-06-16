@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 
-def load_data(filename, config):
+def load_data(filename, config, load_offset=0):
     frame_array = []
     threshold_frame_array = []
     cleaned_frame_array = []
@@ -17,7 +17,14 @@ def load_data(filename, config):
     success = True
     calculated_starting_frame = False
     background_image = None
+    
+    success, image = vidcap.read()
 
+    while load_offset > 0:
+        success, image = vidcap.read()
+        load_offset = load_offset - 1
+
+    
     while success and len(frame_array) <= config.MAXIMUM_FRAME_NO:
         # write files to frames
         success, image = vidcap.read()
@@ -51,7 +58,7 @@ def load_data(filename, config):
                 image = 255 - abs(image/2 - background_image/2)
 
         threshold_image = (image < config.THRESHOLD_LEVEL).astype(int)
-
+        
         if (not calculated_starting_frame and threshold_image.any()
                 and not threshold_image[0, :].any()):
             # there is a droplet in the frame and it is full in the frame
@@ -75,6 +82,7 @@ def load_data(filename, config):
                 frame_data_array = []
                 calculated_starting_frame = None
             elif len(contour) == 0:
+                vidcap.release()
                 return (frame_array, threshold_frame_array,
                         cleaned_frame_array, convex_frame_array, contour_array,
                         np.array(convex_frame_data), np.array(frame_data_array),
@@ -101,7 +109,10 @@ def load_data(filename, config):
                     filled_frame, starty, config))
 
         count += 1
+    
+    print(count)
 
+    vidcap.release()
     return (frame_array, threshold_frame_array,
             cleaned_frame_array, convex_frame_array, contour_array,
             np.array(convex_frame_data), np.array(frame_data_array),

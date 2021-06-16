@@ -10,6 +10,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
+import scipy.signal
 
 import constants
 from display import (
@@ -64,13 +65,17 @@ def find_dynamic_max_spread(contact_widths, pre_impact_frame):
     returns: the frame that contains the maximum spread of
     the droplet
     """
+    print(contact_widths[pre_impact_frame:pre_impact_frame+20])
+    print(pre_impact_frame)
+    if pre_impact_frame <= 0:
+        return np.argmax(contact_widths[0:20])
+
     return np.argmax(contact_widths[
             pre_impact_frame:pre_impact_frame+15]) + pre_impact_frame
 
 
 def post_impact_convex_analysis(reflection_cleaned_frame, config):
     """
-
     returns:
      - frame with convex version of the hull
      - solidity rating for the droplet in this frame
@@ -89,10 +94,15 @@ def post_impact_convex_analysis(reflection_cleaned_frame, config):
     # if e.g. the droplet splits apart
     object_sizes = np.array([cv2.moments(c)['m00'] for c in cs])
 
+    if not len(object_sizes):
+        return convex_frame, 0, 0
     i = np.argmax(object_sizes)
     c = cs[i]
 
     area = cv2.contourArea(c)
+
+    if area < config.MINIMUM_DROPLET_AREA:
+        return convex_frame, 0, 0
 
     convex_hull = cv2.convexHull(c)
     convex_area = cv2.contourArea(convex_hull)
@@ -104,6 +114,47 @@ def post_impact_convex_analysis(reflection_cleaned_frame, config):
     height = (cv2.boundingRect(c)[3] - 1) * config.PIXELS_TO_METERS
 
     return convex_frame, solidity, height
+
+
+def post_impact_roughness_analysis(reflection_cleaned_frame, config):
+    """
+    Returns the rms roughness, results from peak finding, other roughness
+    definitions
+    """
+
+    heights = np.argmax(reflection_cleaned_frame, axis=0)
+    heights = heights[heights > 0]
+
+    # taking the median here to ignore edge effects
+    average_height = np.average(heights)
+
+    height_deviations = heights - average_height
+
+    # limit the heights somewhat to avoid the impact of non-peaked spreading?
+
+    ra = np.average(np.abs(height_deviations)) * config.PIXELS_TO_METERS
+
+    rms = np.average(height_deviations**2)**(1/2) * config.PIXELS_TO_METERS
+
+    # Arithmetical mean deviation of the assesed profile
+    # going to assume peaks are more than 8 pixels apart
+    # and more than 2 pixels in prominence
+    peaks, a = scipy.signal.find_peaks(-1 * heights, distance=8)
+
+    #plt.figure()
+
+    #plt.imshow(reflection_cleaned_frame, cmap='gray')
+
+    #droplet_start_point = np.argmax(reflection_cleaned_frame.any(axis=0))
+
+    #plt.plot(
+    #    [x + droplet_start_point for x in range(heights.shape[0])], heights)
+    #plt.plot(peaks + droplet_start_point, heights[peaks], "x")
+    # prominence=(0.3, None)
+    #plt.show()
+
+    return (average_height * config.PIXELS_TO_METERS, ra, rms,
+            peaks, a, heights)
 
 
 def summarise_data(full_frames_data, config):
@@ -207,7 +258,7 @@ def summarise_data(full_frames_data, config):
     return summary
 
 
-def summarise_frame_data(full_frames_data, frame_number, config,):
+def summarise_frame_data(full_frames_data, frame_number, config):
     """
     return for specified frame
     time, since pre impact frame, height, contact width, solidity
@@ -215,15 +266,21 @@ def summarise_frame_data(full_frames_data, frame_number, config,):
     time = (frame_number -
             full_frames_data['pre_impact_frame'])/config.FRAMES_PER_SECOND
 
-    height = full_frames_data['frame_data'][frame_number, 4]
+    # height = full_frames_data['frame_data'][frame_number, 4]
+    height = full_frames_data['reflection_cleaned_heights'][frame_number]
     contact_width = full_frames_data['contact_width'][frame_number]
     max_width = full_frames_data['frame_data'][frame_number, 5]
     solidity = full_frames_data['solidity'][frame_number]
+    no_peaks = full_frames_data['peak_count'][frame_number]
+    roughness_peaks = full_frames_data['mean_roughness'][frame_number]
 
-    return [frame_number, time, height, contact_width, max_width, solidity]
+
+    return [frame_number, time, height, contact_width,
+            max_width, solidity, no_peaks]
 
 
-def process_side_video(filename, config, graphs=True, save_filename=None):
+def process_side_video(filename, config, graphs=True, save_filename=None,
+                       contact_line=None):
     (frame_array, threshold_frame_array,
      cleaned_frame_array, convex_frame_array, droplet_contours,
      convex_frame_data, frame_data, frame_offset) = load_data(
@@ -287,18 +344,23 @@ def process_side_video(filename, config, graphs=True, save_filename=None):
     # this also gives the reported weber numbers
 
     # compute other stuff
-    # compute contact line and contact line dynamics
+    # compute contact line and contact line  aldynamics
 
     # create numpy array of contact line dynamics ()
     # for all of the frames
-    line, contact_points_x, contact_points_y = find_equation_of_contact_line(
-        droplet_contours, pre_impact_frame, config, return_points=True)
+    if contact_line is None:
+        line, contact_points_x, contact_points_y = find_equation_of_contact_line(
+            droplet_contours, pre_impact_frame, config, return_points=True)
+
+        if line is None:
+            # make line instead the bottom of the frame
+            line = np.poly1d([0, cleaned_frame_array[0].shape[0] - 1])
+    else:
+        line = contact_line
 
     contact_widths = []
-    if line is None:
-        # make line instead the bottom of the frame
-        line = np.poly1d([0, cleaned_frame_array[0].shape[0] - 1])
     full_frames_data['contact_line'] = line
+
     for frame in cleaned_frame_array:
         contact_widths.append(find_contact_width(frame, line, config))
 
@@ -313,8 +375,9 @@ def process_side_video(filename, config, graphs=True, save_filename=None):
     # pick that frame as the pre impact frame
 
     center = int(frame_array[0].shape[1]/2)
-    while (blackout_frame[int(convex_frame_data[pre_impact_frame + 1, 2] /
-                              config.PIXELS_TO_METERS), center] == 0):
+    while ((blackout_frame[int(convex_frame_data[pre_impact_frame + 1, 2] /
+                              config.PIXELS_TO_METERS), center] == 0)
+            and pre_impact_frame >= 0):
         pre_impact_frame = pre_impact_frame - 1
 
     full_frames_data['pre_impact_frame'] = pre_impact_frame
@@ -326,22 +389,47 @@ def process_side_video(filename, config, graphs=True, save_filename=None):
     reflection_cleaned_heights = []
     solidity = []
 
+    mean_roughness = []
+    rms_roughness = []
+    peak_count = []
+    peaks = []
+    mean_height = []
+    heights = []
+
     for frame in reflection_cleaned_frames:
         f, solid, height = post_impact_convex_analysis(frame, config)
         reflection_cleaned_convex_frames.append(f)
         reflection_cleaned_heights.append(height)
         solidity.append(solid)
 
+    for frame in cleaned_frame_array:
+        # peak finding
+        mh, ra, rms, ps, peak_detail, hs = post_impact_roughness_analysis(
+            frame, config)
+
+        mean_height.append(mh)
+        mean_roughness.append(ra)
+        rms_roughness.append(rms)
+        peak_count.append(len(ps))
+        peaks.append((ps, peak_detail))
+        heights.append(hs)
+
     full_frames_data['solidity'] = solidity
     full_frames_data[
-        'reflect_cleaned_heights'] = reflection_cleaned_heights
+        'reflection_cleaned_heights'] = reflection_cleaned_heights
+    full_frames_data['mean_height'] = mean_height
+    full_frames_data['mean_roughness'] = mean_roughness
+    full_frames_data['rms_roughness'] = rms_roughness
+    full_frames_data['peak_count'] = peak_count
+    full_frames_data['peaks'] = peaks
+    full_frames_data['heights'] = heights
 
     # MAX SPREAD ANALYSIS
     # compute max spread frame -> give max spread
     max_spread_frame = find_dynamic_max_spread(contact_widths,
                                                pre_impact_frame)
 
-    max_diameter_frame = find_dynamic_max_spread(diameters,
+    max_diameter_frame = find_dynamic_max_spread(frame_data[:, 4],
                                                  pre_impact_frame)
 
     full_frames_data['max_spread_frame'] = max_spread_frame
@@ -355,31 +443,35 @@ def process_side_video(filename, config, graphs=True, save_filename=None):
     # due to the maximum rosensweig instabilities
 
     if graphs:
+
+        try:
+            display_frame_and_surrounding(
+                frame_array, max_diameter_frame, config,
+                title="Maximum Diameter Frame")
+            display_frame_and_surrounding(
+                 frame_array, max_spread_frame, config,
+                 title="Maximum spread frame")
+        except Exception:
+            print("Can't plot max diameter frame")
+
+        graph_velocities_and_length(full_frames_data, config)
+
         animation = display_video_with_com(
             (frame_array, cleaned_frame_array,
              convex_frame_array, reflection_cleaned_frames,
              reflection_cleaned_convex_frames),
-            full_frames_data, config, line=line)
-
-        display_frame_and_surrounding(
-            frame_array, max_spread_frame, config,
-            title="Maximum spread frame")
-
-        display_frame_and_surrounding(
-            frame_array, max_diameter_frame, config,
-            title="Maximum Diameter Frame")
-
-        graph_velocities_and_length(full_frames_data, config)
+             full_frames_data, config, line=line)
 
         plt.show()
 
     if save_filename:
         if not os.path.exists(os.path.dirname(save_filename)):
+            print(os.path.dirname(save_filename))
             os.makedirs(os.path.dirname(save_filename))
         with open(save_filename, "wb") as f:
             pickle.dump(full_frames_data, f)
 
-    return (summary, frame_offset)
+    return (summary, frame_offset, line)
 
 
 if __name__ == '__main__':

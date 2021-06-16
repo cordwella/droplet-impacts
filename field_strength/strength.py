@@ -24,7 +24,7 @@ plt.plot(dist, field, 'o', xnew, ynew, '-')
 plt.title("Magnetic field on axis (December 13 2019)")
 plt.xlabel("Distance (mm)")
 plt.ylabel("Magnetic Field on-axis (T)")
-# plt.show()
+plt.show()
 
 field_at_x = f(distance)
 
