@@ -28,6 +28,20 @@ def save_background_subtracted(filename, startframe, noframes, outputfilename,
     ani.save(outputfilename)
     # plt.show()
 
+def save_background_subtracted_windows(filename, startframe, noframes, outputfilename,
+                               config):
+    # open video_
+    frame_array = load_data(filename, config)
+
+
+    frame_array = frame_array[0][startframe:startframe + noframes]
+
+    width, height, channels = frame_array[0].shape
+    # x = np.array([[frame, frame, frame] for frame in video_frames])
+    # print(x.shape)
+    fps = 24
+    clip = moviepy.editor.VideoClip(lambda i: frame_array[int(i*fps)], duration=len(frame_array)/fps)
+    clip.write_videofile(save_filename, fps=fps)
 
 if __name__ == '__main__':
     startframe = 0  # int(input("Start frame wrt to output labelling"))
@@ -35,7 +49,7 @@ if __name__ == '__main__':
     filename = input("Filename")
     output_save_filename = input("Output filename")
 
-    save_background_subtracted(filename, startframe, noframes,
+    save_background_subtracted_windows(filename, startframe, noframes,
                                output_save_filename,
                                constants.ConfigurationDecember9)
     # use analyse drop fall to open and clean video
