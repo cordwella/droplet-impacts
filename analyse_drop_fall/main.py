@@ -197,7 +197,22 @@ def summarise_data(full_frames_data, config):
        pre frame, pre time, pre length, pre contact width, pre width, pre solidity, pre volume
        pre com v, pre weber,
        max spread frame, spread time, spread height, spread contact width, spread max width, spread solidity,
-     """
+    """
+    """
+     first frame	time before impact	initial length	initial contact width
+     initial diameter	initial solidity	initial peaks	initial volume
+     initial surface area	pre impact frame number	pre impact time to pre impact
+     pre impact length	pre impact contact width	pre impact diameter
+     pre imapct solidity	pre impact peaks	pre impact volume
+     pre impact surface area	pre impact com velocity	pre impact tip velocity
+     pre impact weber number	pre impact weber number fixed volume
+     pre impact weber number tip	max spread frame number
+     max spread time	max spread height	max spread contact width
+     max spread diameter	max spread solidity	max spread peaks
+     max diameter frame number	max diameter time
+     max diameter height	max diamter contact width	max diameter diameter
+     max diameter solidity	max diameter peaks
+    """
 
     first_frame = summarise_frame_data(full_frames_data, 0, config)
     first_frame.append(full_frames_data['convex_frame_data'][0, 9])  # volume
@@ -442,15 +457,14 @@ def process_side_video(filename, config, graphs=True, save_filename=None,
     # and the second will occur either due to the splash or
     # due to the maximum rosensweig instabilities
 
+    print(filename)
+
     if graphs:
 
         try:
             display_frame_and_surrounding(
                 frame_array, max_diameter_frame, config,
                 title="Maximum Diameter Frame")
-            display_frame_and_surrounding(
-                 frame_array, max_spread_frame, config,
-                 title="Maximum spread frame")
         except Exception:
             print("Can't plot max diameter frame")
 

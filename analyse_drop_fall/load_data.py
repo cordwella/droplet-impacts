@@ -17,14 +17,16 @@ def load_data(filename, config, load_offset=0):
     success = True
     calculated_starting_frame = False
     background_image = None
-    
+
     success, image = vidcap.read()
+
+    print(success, image)
 
     while load_offset > 0:
         success, image = vidcap.read()
         load_offset = load_offset - 1
 
-    
+
     while success and len(frame_array) <= config.MAXIMUM_FRAME_NO:
         # write files to frames
         success, image = vidcap.read()
@@ -58,7 +60,7 @@ def load_data(filename, config, load_offset=0):
                 image = 255 - abs(image/2 - background_image/2)
 
         threshold_image = (image < config.THRESHOLD_LEVEL).astype(int)
-        
+
         if (not calculated_starting_frame and threshold_image.any()
                 and not threshold_image[0, :].any()):
             # there is a droplet in the frame and it is full in the frame
@@ -109,7 +111,7 @@ def load_data(filename, config, load_offset=0):
                     filled_frame, starty, config))
 
         count += 1
-    
+
     print(count)
 
     vidcap.release()
@@ -129,47 +131,84 @@ def clean_frame(threshold_frame, config):
     https://docs.opencv.org/2.4/modules/imgproc/doc/structural_analysis_and_shape_descriptors.html
     """
 
-    cs, _ = cv2.findContours(threshold_frame.astype('uint8'),
-                             mode=cv2.RETR_LIST,
-                             method=cv2.CHAIN_APPROX_SIMPLE)
-    # set up the 'ConvexImage' bit of regionprops.
-    filled_frame = np.zeros(threshold_frame.shape[0:2]).astype('uint8')
-    convex_frame = np.zeros(threshold_frame.shape[0:2]).astype('uint8')
+    if config.CLEAN_FRAME:
 
-    # for each contour c in cs:
-    # will demonstrate with cs[0] but you could use a loop.
-    object_sizes = np.array([cv2.moments(c)['m00'] for c in cs])
+        cs, _ = cv2.findContours(threshold_frame.astype('uint8'),
+                                 mode=cv2.RETR_LIST,
+                                 method=cv2.CHAIN_APPROX_SIMPLE)
+        # set up the 'ConvexImage' bit of regionprops.
+        filled_frame = np.zeros(threshold_frame.shape[0:2]).astype('uint8')
+        convex_frame = np.zeros(threshold_frame.shape[0:2]).astype('uint8')
 
-    if not object_sizes.any():
-        return filled_frame, convex_frame, []
-    i = np.argmax(object_sizes)
-    c = cs[i]
-    # calculate some things useful later:
-    # m = cv2.moments(c)
+        # for each contour c in cs:
+        # will demonstrate with cs[0] but you could use a loop.
+        object_sizes = np.array([cv2.moments(c)['m00'] for c in cs])
 
-    # ** regionprops **
-    # area = m['m00']
-    # print("region area", area)
+        if not object_sizes.any():
+            return filled_frame, convex_frame, []
+        i = np.argmax(object_sizes)
+        c = cs[i]
+        # calculate some things useful later:
+        # m = cv2.moments(c)
 
-    cv2.drawContours(filled_frame, cs, i, color=1, thickness=-1)
+        # ** regionprops **
+        # area = m['m00']
+        # print("region area", area)
 
-    # this should only come up when the droplet is falling
-    # not when it's on the ground at which point it shouldn't be
-    # convex
-    # CONVEX HULL stuff
-    # convex hull vertices
-    convex_hull = cv2.convexHull(c)
-    # convex_area = cv2.contourArea(convex_hull)
-    # Solidity := Area/ConvexArea
-    # solidity = area/convex_area
-    # print("region solidity", solidity)
-    # convexImage -- draw on convexI
-    cv2.drawContours(convex_frame, [convex_hull], -1,
-                     color=1, thickness=-1)
-    # this is the most useful as it can be passed back to what I actually
-    # calculate in my code
+        cv2.drawContours(filled_frame, cs, i, color=1, thickness=-1)
 
-    return filled_frame, convex_frame, c
+        # this should only come up when the droplet is falling
+        # not when it's on the ground at which point it shouldn't be
+        # convex
+        # CONVEX HULL stuff
+        # convex hull vertices
+        convex_hull = cv2.convexHull(c)
+        # convex_area = cv2.contourArea(convex_hull)
+        # Solidity := Area/ConvexArea
+        # solidity = area/convex_area
+        # print("region solidity", solidity)
+        # convexImage -- draw on convexI
+        cv2.drawContours(convex_frame, [convex_hull], -1,
+                         color=1, thickness=-1)
+        # this is the most useful as it can be passed back to what I actually
+        # calculate in my code
+
+        return filled_frame, convex_frame, c
+    else:
+        # we dont want to get rid of smaller droplets
+        cs, _ = cv2.findContours(threshold_frame.astype('uint8'),
+                                 mode=cv2.RETR_LIST,
+                                 method=cv2.CHAIN_APPROX_SIMPLE)
+        # set up the 'ConvexImage' bit of regionprops.
+        filled_frame = np.zeros(threshold_frame.shape[0:2]).astype('uint8')
+        convex_frame = np.zeros(threshold_frame.shape[0:2]).astype('uint8')
+
+        # for each contour c in cs:
+        # will demonstrate with cs[0] but you could use a loop.
+        object_sizes = np.array([cv2.moments(c)['m00'] for c in cs])
+
+        if not object_sizes.any():
+            return filled_frame, convex_frame, []
+        i = np.argmax(object_sizes)
+        c = cs[i]
+        # calculate some things useful later:
+        # m = cv2.moments(c)
+
+        convex_hull = cv2.convexHull(c)
+        # convex_area = cv2.contourArea(convex_hull)
+        # Solidity := Area/ConvexArea
+        # solidity = area/convex_area
+        # print("region solidity", solidity)
+        # convexImage -- draw on convexI
+        cv2.drawContours(convex_frame, [convex_hull], -1,
+                         color=1, thickness=-1)
+        # this is the most useful as it can be passed back to what I actually
+        # calculate in my code
+
+        # were not going to actually return the filled frame
+        # just the original thresholded frame and the convex hull
+        # makes life easier for Alex's code
+        return threshold_frame, convex_frame, c
 
 
 def compute_droplet_values_single_frame(threshold_frame, starty, config):
@@ -203,10 +242,14 @@ def compute_droplet_values_single_frame(threshold_frame, starty, config):
     while True:
         line = threshold_frame[y_coord, :]
         # measure pixel to pixel distance
-        width = np.count_nonzero(line) - 1
-        if width == -1:
-            # no longer counting the actual size
+        if np.count_nonzero(line) == 0:
             break
+
+        width = len(line) - np.argmax(line) - np.argmax(line[::-1])	- 1
+        # width = np.count_nonzero(line) - 1
+        #if width == -1:
+            # no longer counting the actual size
+        #    break
         if width > max_width:
             max_width = width
         coords = line.nonzero()[0]

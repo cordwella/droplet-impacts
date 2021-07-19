@@ -265,7 +265,7 @@ def get_blackout_frame(shape, line, config):
     below the reflection line blacked out
     """
     # remove reflective area from the thresholded frames
-    frame_width = shape[0]
+    frame_width = shape[1]
     blackout_frame = np.zeros(shape[0:2]).astype('uint8')
 
     polygon_points = [[0, 0], [0, line(0)], [frame_width, line(frame_width)],

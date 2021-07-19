@@ -12,8 +12,8 @@ import numpy as np
 
 def display_video_with_com(frame_arrays,
                            frame_data, config, line=None):
-
-    fig, ax = plt.subplots(1, len(frame_arrays), sharey='all', sharex='all')
+    num_plots = 3
+    fig, ax = plt.subplots(1, num_plots, sharey='all', sharex='all')
     plt.tight_layout()
 
     if line is not None:
@@ -24,7 +24,7 @@ def display_video_with_com(frame_arrays,
         comx = frame_data['frame_data'][i, 1]/config.PIXELS_TO_METERS
         comy = frame_data['frame_data'][i, 0]/config.PIXELS_TO_METERS
 
-        for n in range(len(frame_arrays)):
+        for n in range(num_plots): # range(len(frame_arrays)):
             ax[n].clear()
             if line is not None and config.DISPLAY_CONTACT_LINE:
                 ax[n].plot(xp, y, label='Contact Line')
@@ -47,6 +47,7 @@ def display_video_with_com(frame_arrays,
     # on the clean heights include the peaks
     # ax[3].scatter()
 
+    plt.tight_layout()
 
     ani = animation.FuncAnimation(fig, loop_frame, frames=len(frame_arrays[0]) - 1,  # noqa
                                   interval=30)
@@ -64,17 +65,20 @@ def graph_velocities_and_length(full_frame_data, config):
     max_diameter_time = (
         full_frame_data['max_diameter_frame']/config.FRAMES_PER_SECOND)
     # plot velocities as a function of time
+
+	# velocity plot till
+    final_velocity_frame = -1
     times = np.arange(
         0, len(full_frame_data['frame_data']), 1)/config.FRAMES_PER_SECOND
     # velocity_times = times
     velocity_times = times[:-1] #  + .5/config.FRAMES_PER_SECOND
-    ax[0, 0].plot(velocity_times, full_frame_data['velocities']['com'],
+    ax[0, 0].plot(velocity_times[:final_velocity_frame], full_frame_data['velocities']['com'][:final_velocity_frame],
                   label="CoM Velocity")
-    ax[0, 0].plot(velocity_times, full_frame_data['velocities']['comx'],
+    ax[0, 0].plot(velocity_times[:final_velocity_frame], full_frame_data['velocities']['comx'][:final_velocity_frame],
                   label="CoM x Velocity")
-    ax[0, 0].plot(velocity_times, full_frame_data['velocities']['tip'],
+    ax[0, 0].plot(velocity_times[:final_velocity_frame], full_frame_data['velocities']['tip'][:final_velocity_frame],
                   label="Tip Velocity")
-    ax[0, 0].plot(velocity_times, full_frame_data['velocities']['top'],
+    ax[0, 0].plot(velocity_times[:final_velocity_frame], full_frame_data['velocities']['top'][:final_velocity_frame],
                   label="Top Velocity")
     ax[0, 0].axvline(x=pre_impact_time, label='Pre Impact Time',
                      color='black')
@@ -87,7 +91,7 @@ def graph_velocities_and_length(full_frame_data, config):
 
     ax[0, 1].plot(times, full_frame_data['frame_data'][:, 4],
                   label="Droplet Diameter")
-    # ax[0, 1].plot(times, full_frame_data['frame_data'][:, 5],
+    #ax[0, 1].plot(times, full_frame_data['frame_data'][:, 5],
     #           label="Droplet Length")
     ax[0, 1].plot(times, full_frame_data['reflection_cleaned_heights'],
                   label="Droplet Length / Height")
@@ -107,14 +111,14 @@ def graph_velocities_and_length(full_frame_data, config):
     # plt.axis([None, None, 0, 2e-8])
     ax[0, 1].legend()
 
-    ax[1, 1].plot(velocity_times,
-                  full_frame_data['weber_numbers']['first_princ_conical'],
+    ax[1, 1].plot(velocity_times[:final_velocity_frame],
+                  full_frame_data['weber_numbers']['first_princ_conical'][:final_velocity_frame],
                   label="Weber number \n(Conical area)")
-    ax[1, 1].plot(velocity_times,
-                  full_frame_data['weber_numbers']['fixed_volume'],
+    ax[1, 1].plot(velocity_times[:final_velocity_frame],
+                  full_frame_data['weber_numbers']['fixed_volume'][:final_velocity_frame],
                   label="Weber number \n(Fixed Volume)")
-    ax[1, 1].plot(velocity_times,
-                  full_frame_data['weber_numbers']['tip'],
+    ax[1, 1].plot(velocity_times[:final_velocity_frame],
+                  full_frame_data['weber_numbers']['tip'][:final_velocity_frame],
                   label="Weber number \n(Tip Velocity)")
     ax[1, 1].axvline(x=pre_impact_time, label='Pre Impact Time',
                      color='black')
@@ -138,7 +142,7 @@ def graph_velocities_and_length(full_frame_data, config):
 
     ax[0, 2].plot(times, full_frame_data['solidity'],
                   label="Solidity (area/convex area)")
-    ax[0, 2].axvline(x=max_spread_time, label='Maximum Spread',
+    ax[0, 2].axvline(x=max_diameter_time, label='Maximum Diameter',
                      color='grey')
     ax[0, 2].axvline(x=pre_impact_time, label='Pre Impact Time',
                      color='black')

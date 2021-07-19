@@ -6,20 +6,9 @@ from file_list import file_list
 import os
 
 csv_filename = "C:/Users/acor102/Documents/ferrofluids/FIXED_summary.csv" # noqa
-filename = r"C:\Users\acor102\Documents\ferrofluids\data\amelia_data\6-jan\from_top_4.0mm\dist_-740_crown_20200106_170923_C2\dist_-740_crown_m_20200106_170923_C2.avi"
+filename = "C:\\Users\\acor102\\Documents\\ferrofluids\\data\\alex_data\\May2021\\H260mm_M3353_1_C2\\H260mm_M3353_1_C2.avi"
 
-filename = r"C:\Users\acor102\Documents\ferrofluids\data\amelia_data\6-jan\from_top_7.2mm\dist_-800_spread_20200106_163252_C2\dist_-800_spread_20200106_163252_C2.avi"
-
-data_save_filename = filename.replace(r"C:\Users\acor102\Documents\ferrofluids\data\amelia_data",
-                                      "C:/Users/acor102/ferrofluids/data/Amelia/").replace(".avi", ".p") # noqa
-#filename = "file://files.auckland.ac.nz/research/ressci201800021-ferrofluids/Alex/Ferrodata/Jan12-13/H660mm/H660mm_M3063_1_C2/H660mm_M3063_1_C2.avi"
-#data_save_filename = filename.replace("file://files.auckland.ac.nz/research/ressci201800021-ferrofluids/Alex/Ferrodata/",
-#                                       "C:/Users/acor102/Documents/ferrofluids/data/Alex/").replace(".avi", ".p") # noqa
-
-# check top down video
-print("melt \"{}\"".format(filename.replace("C2", "C2")))
-
-use_filenames = "_C2.avi"
+filename = r"\\files.auckland.ac.nz\research\ressci201800021-ferrofluids\Phase plot data\Needle\No Magnet\t20c1_C1\t20c1_C1.avi"
 
 # folder name, then config and magnet distance calculation
 alex_magnet_height = lambda x: 35.61 - (float(x.split("_")[-3][1:])/100)
@@ -37,62 +26,51 @@ config_to_use = {
     'May2021': (constants.ConfigurationMay2021, alex_magnet_height),
 }
 
-for fn in file_list:
-    data_save_filename = fn.replace("C:\\Users\\acor102\\Documents\\ferrofluids\\data\\",
-                                    "C:\\Users\\acor102\\Documents\\ferrofluids\\data\\pickled\\").replace(".avi", ".p") # noqa
+data_save_filename = filename.replace("C:\\Users\\acor102\\Documents\\ferrofluids\\data\\",
+								"C:\\Users\\acor102\\Documents\\ferrofluids\\data\\pickled\\").replace(".avi", ".p") # noqa
 
-    #data_save_filename = data_save_filename.replace(
-    #    "C:/Users/acor102/Documents/ferrofluids/data\\",
-    #    "C:/Users/acor102/ferrofluids/data/pickled/")
 
-    if 'alex' in fn:
-        continue
-    if os.path.exists(data_save_filename):
-        print("Processing already completed")
-        continue
-    if "_m_" in fn.split("\\")[-1]:
-        print("Modified speed file")
-        continue
+# ID to use
+# config_id = filename.split("\\")[7]
+# configuration, mag_lambda = config_to_use[config_id]
+configuration = constants.ConfigurationStephen
+#if 'touch' in filename:
+#	magnet_height = 2
+#else:
+#	magnet_height = mag_lambda(filename)
+magnet_height = 23
 
-    # ID to use
-    config_id = fn.split("\\")[7]
-    configuration, mag_lambda = config_to_use[config_id]
-    if 'touch' in fn:
-        magnet_height = 2
-    else:
-        magnet_height = mag_lambda(fn)
+print(filename, magnet_height, configuration.__name__, data_save_filename)
 
-    print(fn, magnet_height, configuration.__name__, data_save_filename)
+# find mag field
+summary, frame_offset, line = process_side_video(
+	filename, configuration, save_filename=None, graphs=True)
 
-    # find mag field
-    summary, frame_offset, line = process_side_video(
-        fn, configuration, save_filename=data_save_filename, graphs=False)
+summary = list(summary)
 
-    summary = list(summary)
+classification_definitions = """r = rim forms
+nm = no magnetic spikes
+s = spikes form
 
-    classification_definitions = """r = rim forms
-    nm = no magnetic spikes
-    s = spikes form
+i = ignore dont write anything
+anything else is considerd a comment
+append v on the end to not the velocity might not be great
+"""
+print(classification_definitions)
+# comment = input("Video classification: ")
+comment = 'i' # unknown, automatic
+if comment[0] == 'i':
+	sys.exit()
+d = datetime.datetime.now().strftime("%I:%M%p %B %d %Y")
 
-    i = ignore dont write anything
-    anything else is considerd a comment
-    append v on the end to not the velocity might not be great
-    """
-    print(classification_definitions)
-    # comment = input("Video classification: ")
-    comment = 'u' # unknown, automatic
-    if comment[0] == 'i':
-        sys.exit()
-    d = datetime.datetime.now().strftime("%I:%M%p %B %d %Y")
+# add some adminy stuff to this
+help_summary = [filename, d, configuration.__name__, magnet_height,
+				frame_offset, comment]
+t = [str(i) for i in help_summary + summary]
 
-    # add some adminy stuff to this
-    help_summary = [fn, d, configuration.__name__, magnet_height,
-                    frame_offset, comment]
-    t = [str(i) for i in help_summary + summary]
+# write to csv file
+full = ",".join(t) + "\r\n"
 
-    # write to csv file
-    full = ",".join(t) + "\r\n"
-
-    print(full)
-    with open(csv_filename, 'a') as f:
-        f.write(full)
+#print(full)
+#with open(csv_filename, 'a') as f:
+#	f.write(full)

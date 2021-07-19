@@ -8,7 +8,7 @@ import numpy as np
 
 class ConfigurationGeneric(object):
     DENSITY = 1210       # The density of the ferrofluid (kg/m^3)
-    SURFACE_TENSION = 0.026  # The surface tension of the ferrofluid
+    SURFACE_TENSION = 0.026  # The surface tension of the ferrofluid in (N/m)
 
     # maxiumum number of frames to consider
     MAXIMUM_FRAME_NO = 100
@@ -46,6 +46,8 @@ class ConfigurationGeneric(object):
     VOLUME_MAXIMUM_FRAME_NO = 20
     VOLUME_THRESHOLD_LEVEL = 147
 
+    CLEAN_FRAME = True
+
 
 
 class ConfigurationStephen(ConfigurationGeneric):
@@ -68,6 +70,9 @@ class ConfigurationStephen(ConfigurationGeneric):
         "Sm_16.5mm": 0.079920,
         "Sm_23mm": 0.040531
     }
+
+    CLEAN_FRAME = False
+
 
 
 
@@ -219,7 +224,7 @@ class ConfigurationTouch(ConfigurationGeneric):
 # Below are Alex's config things
 # I'll probably redo them though
 class ConfigurationDec10_2020(ConfigurationGeneric):
-
+    CLEAN_FRAME = False
     SUBTRACT_BACKGROUND = True
 
     ### Need to ask what this is
@@ -245,14 +250,15 @@ class ConfigurationDec10_2020(ConfigurationGeneric):
 
 
 class ConfigurationJan12_2021(ConfigurationGeneric):
+    CLEAN_FRAME = False
 
     SUBTRACT_BACKGROUND = True
 
-    THRESHOLD_LEVEL = 146 #15.194869987468792, was 215
+    THRESHOLD_LEVEL = 180 #15.194869987468792, was 215 was 146
     VOLUME_THRESHOLD_LEVEL = 189.15433782875047
     VOLUME_MAXIMUM_FRAME_NO = 4000
 
-    CROP_DIMENSIONS = (0, 0, 620, 750)
+    CROP_DIMENSIONS = (100, 0, 600, 750)
 
     MAXIMUM_FRAME_NO = 4000
 
@@ -264,14 +270,15 @@ class ConfigurationJan12_2021(ConfigurationGeneric):
     PIXELS_TO_METERS = PIXELS_TO_MM * 10 ** (-3)
 
 class ConfigurationJan27_2021(ConfigurationGeneric):
+    CLEAN_FRAME = False
 
     SUBTRACT_BACKGROUND = True
 
-    THRESHOLD_LEVEL = 156 #15.194869987468792 was 215
+    THRESHOLD_LEVEL = 180 # was 156
     VOLUME_THRESHOLD_LEVEL = 189.15433782875047
     VOLUME_MAXIMUM_FRAME_NO = 4000
 
-    CROP_DIMENSIONS = (0, 0, 620, 750)
+    CROP_DIMENSIONS = (0, 100, 700, 700)
 
     MAXIMUM_FRAME_NO = 4000
 
@@ -281,14 +288,15 @@ class ConfigurationJan27_2021(ConfigurationGeneric):
     PIXELS_TO_METERS = PIXELS_TO_MM * 10 ** (-3)
 
 class ConfigurationMay2021(ConfigurationGeneric):
+    CLEAN_FRAME = False
 
     SUBTRACT_BACKGROUND = True
 
-    THRESHOLD_LEVEL = 165 #15.194869987468792 was 215
+    THRESHOLD_LEVEL = 165
     VOLUME_THRESHOLD_LEVEL = 189.15433782875047
     VOLUME_MAXIMUM_FRAME_NO = 4000
 
-    CROP_DIMENSIONS = (0, 0, 620, 750)
+    CROP_DIMENSIONS = (0, 400, 550, 700)
 
     MAXIMUM_FRAME_NO = 4000
 
